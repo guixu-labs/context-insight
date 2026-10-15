@@ -10,7 +10,7 @@ Session-level observability for LLM coding agents: import agent session logs and
 
 The [DSH Lineage plugin](agentlineage/integrations/dsh/README.md) now manages a local Core with the Profile lifecycle and an automatic port, reads current/historical native DSH v4 sessions through DSH's session service, and binds snapshots per conversation. Natural-language query, Viewer and report checks need no snapshot ID. External Core mode remains supported. Plugin `0.1.0-alpha.3` supports DSH `0.2.1-rc.2` and installation from the [Fuxi DSH plugin market](https://fuxi-ailabs.github.io/dsh-plugin-market/index.json); see the [market acceptance record](agentlineage/acceptance-evidence/dsh-market-alpha3.json).
 
-Import SQLite (opencode.db) or JSONL (native Claude Code / Codex `rollout-*.jsonl` / DSH `session.v4.jsonl(.zstd)` / cpx proxy captures; plaintext, `.jsonl.7z` and legacy `.jsonl.gz`, `cpx-` prefix handled) and explore the session detail tabs:
+Import SQLite (opencode.db) or JSONL (native Claude Code / Codex `rollout-*.jsonl` / DSH `session.v4.jsonl(.zstd)` / cpx proxy captures; plaintext, `.jsonl.7z` and legacy `.jsonl.gz`, `cpx-` prefix handled) and explore the session detail tabs. A single "JSONL (auto)" entry detects Claude vs Codex vs DSH per file content — no per-framework picker:
 
 - **Tokens & Cost** — 5-item per-turn token breakdown vs the model's context window, plus cost estimation
 - **Active / Wall time** — session detail Wall Clock split (active + inactive = wall) and Active / Wall columns on the homepage: event-clustering semantics (gaps >5min count as inactive, in-flight API calls count as active)
