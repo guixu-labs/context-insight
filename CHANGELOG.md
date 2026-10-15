@@ -8,6 +8,7 @@
 - 【AgentLineage API 接入】同仓保留证据内核、可选 Learning 与 DSH 插件；新增会话快照关联、Core API 入口及按材料摘要和原文坐标定位证据，未知对齐状态和多候选结果显式返回。
 - 【DSH 原生会话 Lineage】本地 Core 随 Profile 托管启停并自动分配端口；新增当前/历史/子会话导入、冻结快照绑定及状态入口，查询无需手填 snapshot_id；支持 DSH v4、PTC 回执和继承边界，保留外部 Core。插件 alpha.3 可从 Fuxi DSH 插件市场安装，兼容 DSH 0.2.1-rc.2。
 - 【dsh（DeepSeek Harness）会话归类】cpx 捕获的 dsh 会话按框架归类显示 DSH 徽标（与 claude / opencode / codex 并列，同 sid 多记录类共存）
+- 【DSH 原生会话导入】`~/.dsh/sessions/**/session.v4.jsonl(.zstd)` 与 dsh-export 导出根可直接导入：多帧 zstd 解压 → 事件转义为会话轮次 → 子代理按 `header.parentSession` 并入主会话时间线（DSH 徽标）
 
 ### Security
 - 【浏览器跨源请求防护】API 增加浏览器来源校验（单点入口 proxy）：非本机页面发起的跨源请求一律拒绝；本地 CLI / TUI / cpx 自动导入等非浏览器调用不受影响
