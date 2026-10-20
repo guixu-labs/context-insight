@@ -7,20 +7,21 @@
 // See LICENSE in the root of the software repository for the full text of the License.
 
 // lake IT：本地 bare 仓（partial clone 全链路）跑 上传治理→push→列表→物化→导入
-// 闭环；native jsonl（含 key 各形态）、opencode DB 导出、治理熔断、redactor parity。
+// 闭环；native jsonl（含 key 各形态）、opencode DB 导出、治理熔断、redaction contract。
 // env 必须在 lake 模块加载前设置（mirror.ts 在模块顶层读取 env）。
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import zlib from 'node:zlib';
 import { PrismaClient } from '@prisma/client';
 import { NextRequest } from 'next/server';
 import { importSession } from '../../src/lib/ingest/data-service.ts';
 import { withDbRaceRetry } from '../db-race';
 import { materializeV1Fixture } from '../helpers/materialize-v1-fixture';
-import { seedLakeConfig, switchLakeConfig } from '../helpers/lake-env';
+import { seedLakeConfig } from '../helpers/lake-env';
+import redactionContract from '../data/lake/redaction-contract.json';
 
 function git(cmd: string, cwd: string): void {
   execSync(cmd, { cwd, stdio: 'pipe', timeout: 60_000 });
@@ -112,7 +113,6 @@ const lake = await import('../../src/lib/lake');
 const mirror = await import('../../src/lib/lake/mirror');
 const governance = await import('../../src/lib/lake/governance');
 const compression = await import('../../src/lib/compression');
-const proxyRedactor = await import('../../../cpx/src/redactor');
 const route = await import('../../src/app/api/ingest/lake/route');
 
 // staging 出仓形态的期望字节：uploadLakeSession 对 .gz 源做「拷贝 →
@@ -146,31 +146,19 @@ afterAll(async () => {
   fs.rmSync(TMP, { recursive: true, force: true });
 });
 
-describe('lake governance: redactor parity（与 proxy/src/redactor.ts 字节一致）', () => {
-  const CORPUS = [
-    `key 是 ${RAW_KEYS[0]}，DASHSCOPE_API_KEY=${RAW_KEYS[1]}，头 "${RAW_KEYS[2]}"`,
-    '"api_key": "0123456789abcdef0123456789abcdef.abcdef123456"',
-    'gsk_AAAABBBBCCCCDDDDEEEEFFFF12345678 / AIza' + 'A'.repeat(35) + ' / xai-1234567890abcdef1',
-    'https://example.com/v1?key=AIzaSyA' + 'B'.repeat(30),
-    'GL-' + 'C'.repeat(30),
-    'max_tokens=4096, tool_use_id=toolu_1, input_tokens=100（零误伤基准）',
-  ];
-  const deep = { authorization: 'Bearer secretcredential123456', nested: { api_key: 'plainvalue1234567890', list: ['sk-ant-api03-ZZZZ9999YYYY8888XXXX7777'] } };
+describe('lake governance: fixed redaction contract', () => {
+  const CORPUS = redactionContract.strings.map(({ input }) => input);
 
-  it('redactString 两份实现输出一致', () => {
-    for (const text of CORPUS) {
-      expect(governance.redactString(text)).toBe(proxyRedactor.redactString(text));
+  it('redactString matches fixed expected bytes', () => {
+    for (const { name, input, expected } of redactionContract.strings) {
+      expect(governance.redactString(input), name).toBe(expected);
     }
   });
 
-  it('redactInPlace 两份实现清洗结果一致且均命中', () => {
-    const a = structuredClone(deep);
-    const b = structuredClone(deep);
-    const changedA = governance.redactInPlace(a);
-    const changedB = proxyRedactor.redactInPlace(b);
-    expect(changedA).toBe(true);
-    expect(changedB).toBe(true);
-    expect(a).toEqual(b);
+  it('redactInPlace matches fixed nested output without changing ordinary fields', () => {
+    const value = structuredClone(redactionContract.object.input);
+    expect(governance.redactInPlace(value)).toBe(true);
+    expect(value).toEqual(redactionContract.object.expected);
   });
 
   it('governText 清洗后复检零残留（掩码形态不再命中）', () => {
@@ -440,7 +428,7 @@ describe('lake 上传快路径（governed 直传）与兜底回退', () => {
       const up = await lake.uploadLakeSession(prisma, SID_F, '提交人: 测试者\n内容描述: governed 直传', undefined, 'others');
       expect(up.unchanged).toBe(false);
       expect(spy).not.toHaveBeenCalled(); // 直传：治理未执行
-      const remote = execSync(`git cat-file -p $(git rev-parse main:others/${SID_F}/${SID_F}.jsonl.7z)`, { cwd: BARE, stdio: 'pipe' });
+      const remote = execFileSync('git', ['cat-file', '-p', `main:others/${SID_F}/${SID_F}.jsonl.7z`], { cwd: BARE, stdio: 'pipe' });
       expect(remote.equals(expected7z)).toBe(true); // 字节级一致（确定性 7z，未重压）
       // cpx 伴生 meta 路径：annotateSessionMeta 补丁伴生 meta——governed 保留、
       // 提交信息快照落地（三条 staging 路径同一补丁点）
@@ -472,7 +460,7 @@ describe('lake 上传快路径（governed 直传）与兜底回退', () => {
       const up = await lake.uploadLakeSession(prisma, SID_S, '提交人: 测试者\n内容描述: 无标记走治理', undefined, 'others');
       expect(up.unchanged).toBe(false);
       expect(spy).toHaveBeenCalled(); // 慢路径：治理执行
-      const remote = execSync(`git cat-file -p $(git rev-parse main:others/${SID_S}/${SID_S}.jsonl.7z)`, { cwd: BARE, stdio: 'pipe' });
+      const remote = execFileSync('git', ['cat-file', '-p', `main:others/${SID_S}/${SID_S}.jsonl.7z`], { cwd: BARE, stdio: 'pipe' });
       const tmp7z = path.join(FIXTURES, `${SID_S}.remote.7z`);
       fs.writeFileSync(tmp7z, remote);
       try {

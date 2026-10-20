@@ -1,0 +1,32 @@
+{
+  "status": "passed",
+  "visible": [
+    "lineage_query",
+    "lineage_open",
+    "lineage_check",
+    "lineage_import",
+    "lineage_sessions",
+    "lineage_bind",
+    "lineage_status"
+  ],
+  "core_version": "0.1.0a10",
+  "core_url": "http://127.0.0.1:52519",
+  "current_session_auto_import": true,
+  "confirmed_writes": 1,
+  "real_file_verified": true,
+  "missing_snapshot_refused": true,
+  "historical": {
+    "status": "passed",
+    "records": 34,
+    "files": 0,
+    "input": "isolated copy of an existing native DSH v4 zstd session"
+  },
+  "model_called": false,
+  "core_port_closed_after_profile_exit": true,
+  "package": {
+    "name": "fuxi-ailabs-dsh-agentlineage-0.1.0-alpha.2.tgz",
+    "sha256": "19deef7051e76281b8250a144c3ae1e83e626da1cc1e38ccfe259f7b549d0376"
+  },
+  "python_source_imports": false,
+  "default_state_scoped_to_profile": true
+}

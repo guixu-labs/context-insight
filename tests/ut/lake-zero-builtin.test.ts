@@ -6,7 +6,7 @@
 // INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
 // See LICENSE in the root of the software repository for the full text of the License.
 
-// 零内置凭据防回潮锁（跨包扫描，自 cpx 侧迁移而来）：cpx 与 insight 全量
+// 零内置凭据防回潮锁（自 cpx 侧迁移而来）：独立 insight 仓全量
 // 源码不得出现密文常量或内嵌凭据 URL——凭据一律走服务端存储与解析链。
 // 嵌入凭据正则为 host 无关形态（不绑定任何托管平台域名）。
 import { describe, it, expect } from 'vitest';
@@ -14,12 +14,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOTS = [
-  path.resolve(__dirname, '../../../cpx/src'),
   path.resolve(__dirname, '../../src'),
 ];
 
-describe('跨包源码零内置凭据（防回潮锁）', () => {
-  it('cpx/insight 源码不得出现密文常量或内嵌凭据 URL', () => {
+describe('Insight 源码零内置凭据（防回潮锁）', () => {
+  it('insight 源码不得出现密文常量或内嵌凭据 URL', () => {
     const encodedConst = /LAKE_PUSH_URL_ENCODED|LAKE_PUSH_URL\s*=/;
     const base64Blob = /=\s*['"][A-Za-z0-9+/]{60,}={0,2}['"]/;
     // Host-agnostic: any user:pass@ URL on any host is forbidden.
@@ -32,7 +31,7 @@ describe('跨包源码零内置凭据（防回潮锁）', () => {
         if (!/\.(ts|tsx|mjs|js)$/.test(e.name)) continue;
         const src = fs.readFileSync(full, 'utf8');
         for (const [name, re] of [['encoded-const', encodedConst], ['base64-blob', base64Blob], ['embedded-creds', embeddedCreds]] as const) {
-          if (re.test(src)) offenders.push(`${path.relative(path.resolve(__dirname, '../../..'), full)}: ${name}`);
+          if (re.test(src)) offenders.push(`${path.relative(path.resolve(__dirname, '../..'), full)}: ${name}`);
         }
       }
     };
@@ -51,9 +50,9 @@ describe('平台中性哨兵（平台化 P1-P3 防回潮锁，词表源 sensitiv
     'CANNBAY2_', 'cannbay-lake', 'cannbay2',
   ];
   const BRAND_NAME_FILES = new Set([
-    'insight/src/lib/branding.ts',
-    'insight/scripts/pack-context.mjs',
-    'insight/tests/e2e/context-pack.test.ts',
+    'src/lib/branding.ts',
+    'scripts/pack-context.mjs',
+    'tests/e2e/context-pack.test.ts',
   ]);
   // cannbay 裸形态：仅允许三个白名单上下文——x_cannbay 双名信封键（P3 过渡）、
   // cannbay-auth.json 读兜底字面量（P1 兼容）、以其为前缀的标识符（xB* 局部
@@ -63,7 +62,7 @@ describe('平台中性哨兵（平台化 P1-P3 防回潮锁，词表源 sensitiv
   // 品牌名白名单文件内 CANNbay/CANNBay 合法（branding 字面量/翻转规则/探针）
   const BRAND_FORMS = /CANNBay|CANNbay/;
 
-  it('双包 src 词表扫描归零（私址/组织/用户名/预设名/env 旧前缀/品牌变体）', () => {
+  it('Insight src 词表扫描归零（私址/组织/用户名/预设名/env 旧前缀/品牌变体）', () => {
     const offenders: string[] = [];
     const walk = (dir: string): void => {
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -92,28 +91,8 @@ describe('平台中性哨兵（平台化 P1-P3 防回潮锁，词表源 sensitiv
     for (const r of ROOTS) walk(r);
     expect(offenders, `平台化词表回潮（敏感词治理见 sensitive-info-audit；白名单外命中即红）:\n${offenders.join('\n')}`).toEqual([]);
   });
-
-  it('cpx 侧信封写点必须双名（旧键写点前 25 行窗口内须有配对 x_lake 写点）', () => {
-    const offenders: string[] = [];
-    const walk = (dir: string): void => {
-      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, e.name);
-        if (e.isDirectory()) { walk(full); continue; }
-        if (!/\.ts$/.test(e.name)) continue;
-        const lines = fs.readFileSync(full, 'utf8').split('\n');
-        lines.forEach((line, i) => {
-          if (/x_cannbay: xLake\(/.test(line)) {
-            const window = lines.slice(Math.max(0, i - 25), i + 1).join('\n');
-            if (!/x_lake: xLake\(/.test(window)) offenders.push(`${rel(full)}:${i + 1}`);
-          }
-        });
-      }
-    };
-    walk(ROOTS[0]);
-    expect(offenders, `cpx 信封写点单名（必须 x_lake + 旧键双挂——双名变换形态为 x_lake 在前、旧键紧随信封对象体之后）:\n${offenders.join('\n')}`).toEqual([]);
-  });
 });
 
 function rel(full: string): string {
-  return path.relative(path.resolve(__dirname, '../../..'), full);
+  return path.relative(path.resolve(__dirname, '../..'), full);
 }

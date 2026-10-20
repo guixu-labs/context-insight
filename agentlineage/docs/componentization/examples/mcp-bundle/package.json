@@ -1,0 +1,11 @@
+{
+  "name": "@team/component-mcp-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Teaching example: connect an existing MCP service to DSH",
+  "exports": { "./locale/*.json": "./locale/*.json" },
+  "files": ["cordis.patch.yml", "README.md", "locale"],
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
+  "peerDependencies": { "@deepseek-ai/dsh-mcp-client": "0.2.1-alpha.2" }
+}

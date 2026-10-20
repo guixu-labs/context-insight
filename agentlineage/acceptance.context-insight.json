@@ -1,0 +1,244 @@
+{
+  "contract": "context-insight.agentlineage-acceptance/v1",
+  "date": "2026-10-19",
+  "timezone": "Asia/Shanghai",
+  "source_commit": "31c09b1244116601c73f015822dc5ba034866453",
+  "target_base_commit": "1cb705390ad7b5eb1b27f73a053490239085ae44",
+  "branch": "codex/agentlineage-integration",
+  "scope": [
+    "AgentLineage Core functionality and public APIs",
+    "Insight session binding and exact native evidence lookup",
+    "Lineage DSH managed/external Core, native DSH v4 sessions and persistent per-conversation snapshot binding on DSH 0.2.1-rc.2",
+    "Preserved optional Learning module; no new executor or publication behavior"
+  ],
+  "environment": {
+    "os": "Windows",
+    "python": "3.12.10",
+    "node": "v26.7.0",
+    "dsh": "0.2.1-rc.2",
+    "cordis": "4.0.5"
+  },
+  "checks": [
+    {
+      "id": "L01",
+      "status": "passed",
+      "result": "Python Core is the shared implementation; Next/DSH only adapt calls; import manifest preserves source origins"
+    },
+    {
+      "id": "L02",
+      "status": "passed",
+      "result": "Existing Core contracts preserved; DSH native v4 through sources/snapshots/query, exact source anchors, invalid-version/sequence/receipt rejection"
+    },
+    {
+      "id": "L03",
+      "status": "passed",
+      "result": "No duplicated native parser, no Prisma schema change; thin server client and DSH adapter"
+    },
+    {
+      "id": "L04",
+      "status": "passed",
+      "result": "Fresh-wheel Python and alpha.3 tgz verified in an isolated DSH Profile; seven tools, write/import/query and owned-Core shutdown passed. Historical alpha.2 evidence retained."
+    },
+    {
+      "id": "L05",
+      "status": "passed",
+      "result": "Full alpha.3 sync gate: 2231 repository tests and 8 DSH tests passed; fresh packaged Profile check passed without a model. Published alpha.3 market E2E separately used a real model and verified write/edit evidence and Viewer."
+    },
+    {
+      "id": "E01",
+      "status": "passed",
+      "result": "Default managed Core uses DSH subprocess ownership, loopback port 0, health/capability check, private token and exclusive directory lease; external Core survives plugin disposal"
+    },
+    {
+      "id": "E02",
+      "status": "passed",
+      "result": "Startup timeout terminates the actual spawned process; missing executable and competing data-directory owner fail cleanly; failed imports preserve prior binding"
+    },
+    {
+      "id": "E03",
+      "status": "passed",
+      "result": "Immutable native source bytes including BOM, frozen snapshots, per-conversation persistent bindings, namespace separation for external Core targets, refresh and restart passed"
+    },
+    {
+      "id": "E04",
+      "status": "passed",
+      "result": "Core regression covers native append/upsert/restart; API test covers append retry, offset conflict, cursor catchup and frozen raw bytes; no Insight collector synchronization claimed"
+    },
+    {
+      "id": "E05",
+      "status": "passed",
+      "result": "Packaged Profile has seven tools; own-session auto-import, compressed cold history, child inheritance, explicit material import, refresh, binding and process cleanup verified"
+    }
+  ],
+  "validation": {
+    "core_learning_pytest": {
+      "passed": 93,
+      "command": "python -m pytest tests -q --tb=short --basetemp <isolated temporary directory>",
+      "cwd": "agentlineage",
+      "environment": "Windows; Python 3.12.10"
+    },
+    "python_static": {
+      "ruff": "passed",
+      "mypy": "passed, 71 source files"
+    },
+    "insight_api": {
+      "passed": 10,
+      "command": "node node_modules/vitest/vitest.mjs run tests/ut/lineage-api.test.ts --reporter=verbose"
+    },
+    "dsh": {
+      "passed": 8,
+      "command": "npm run check",
+      "cwd": "agentlineage/integrations/dsh",
+      "environments": [
+        "Windows Node 26.7.0",
+        "Ubuntu WSL Node 24.11.1"
+      ]
+    },
+    "adjacent_regression": {
+      "status": "passed in full Ubuntu suite",
+      "windows_lake_e2e": {
+        "tests_passed": 36
+      },
+      "platform_note": "Full Windows suite not claimed: Prisma fresh-DB bootstrap and symlink restrictions were observed; CI runs the full Insight suite on Ubuntu and Core/DSH checks on Windows and Ubuntu."
+    },
+    "repository_gate": {
+      "status": "passed",
+      "command": "npm run test:all -- --maxWorkers=4",
+      "environment": "Ubuntu WSL; Node v24.11.1; Python 3.14.4",
+      "files_passed": 255,
+      "files_skipped": 1,
+      "tests_passed": 2231,
+      "tests_skipped": 8,
+      "duration_seconds": 54.26,
+      "ut_gate": {
+        "command": "npm run test -- --maxWorkers=4",
+        "files_passed": 226,
+        "tests_passed": 1906,
+        "tests_skipped": 2,
+        "note": "Prior same-PR UT-only run; current all-suite gate includes these tests."
+      },
+      "scope": "All configured UT and E2E tests; original conditional skips preserved; no sibling cpx source dependency"
+    },
+    "npm_payload": {
+      "status": "passed by npm-publish E2E",
+      "local_state_leaks": 0,
+      "separate_artifacts": "agentlineage is excluded from the Insight npm tarball; Core/Learning wheels and DSH tgz are independently built"
+    },
+    "remote_ci": "pending PR checks; local full gate passed",
+    "packaged_managed_profile": {
+      "status": "passed",
+      "command": "python scripts/verify_dsh_profile.py --dsh-cli <installed DSH bin.js> --python <fresh wheel venv python> --package <alpha.2.tgz> --directory <isolated directory> --saved-session <native v4 zstd copy source>",
+      "tools": 7,
+      "default_profile_state_isolation": true,
+      "current_session_auto_import": true,
+      "real_file_verified": true,
+      "confirmed_writes": 1,
+      "existing_native_session": {
+        "records": 34,
+        "files": 0
+      },
+      "core_stopped_on_profile_exit": true,
+      "python_source_imports": false,
+      "model_called": false,
+      "version": "0.1.0-alpha.2",
+      "scope": "Historical alpha.2 isolated artifact test; alpha.3 market E2E is recorded separately."
+    },
+    "market_alpha3": {
+      "status": "passed",
+      "evidence": "acceptance-evidence/dsh-market-alpha3.json",
+      "source": "Published alpha.3 installed from market; this PR synchronizes metadata/assets and the identical runtime.",
+      "model_called": true,
+      "snapshot_records": 47,
+      "confirmed_writes": 2
+    },
+    "alpha3_sync": {
+      "status": "passed",
+      "evidence": "acceptance-evidence/alpha3-sync-checks.json",
+      "repository_tests_passed": 2231,
+      "repository_tests_skipped": 8,
+      "dsh_tests_passed": 8,
+      "packaged_profile": "passed"
+    }
+  },
+  "remaining_outside_scope": [
+    "Insight analysis/UI must attach native coordinates and the analysis input digest before projection_alignment can be verified",
+    "Insight registered-session API freezes primary plaintext Claude/Codex source; its child/compressed orchestration is separate from the implemented native DSH import path",
+    "No continuous DSH background capture, combined Insight tool bundle, general LLM-driven task quality evaluation, public package release or remote merge",
+    "Learning remains optional; no new paid model run or automatic memory publishing",
+    "Python/Core require one-time installation; managed mode does not download a runtime; Viewer authentication stays in the browser"
+  ],
+  "conclusion": {
+    "component_scope": "passed",
+    "remote_merge_readiness": "local test gate passed; remote CI and maintainer review pending",
+    "delivery": "PR branch; merging is not authorized",
+    "github_connector_permission": "pull=true, push=false",
+    "publication_route": "andrewyuq/context-insight fork -> guixu-labs/context-insight main; current account lacks direct upstream push access"
+  },
+  "evidence": [
+    {
+      "path": "acceptance-evidence/dsh-composed.yml",
+      "sha256": "2036f600f0fa60b7ce4bb3f45d7dcf0f43a2ee391eeb0fc2c19d8cfee98e4c74"
+    },
+    {
+      "path": "acceptance-evidence/dsh-install.txt",
+      "sha256": "18e2ca6eb27a474f28354c57f991272f639db3182237617654ad4283572eb182"
+    },
+    {
+      "path": "acceptance-evidence/dsh-profile.json",
+      "sha256": "d81cae1fedc6ad12e677761ba96867df6619c7ab937c1e82ad82b7dc0847f527"
+    },
+    {
+      "path": "acceptance-evidence/insight-api-test.txt",
+      "sha256": "6f3fdf221108cc312fdc1482b6e05aead93c73ebe55b1ae7194673d73397e134"
+    },
+    {
+      "path": "acceptance-evidence/insight-api.json",
+      "sha256": "f71be13c43de79d68774ae28a4975a70db937217a3f7c8a071bc4201530f8629"
+    },
+    {
+      "path": "acceptance-evidence/installation.json",
+      "sha256": "0f2a4b4b272c061957f96240fe53d3648c67faec7818b38f66022aa47527c434"
+    },
+    {
+      "path": "acceptance-evidence/repository-test-gate.txt",
+      "sha256": "038a8f490c880e9eddbfb784f9ae1fc06b39efc1905d07d7e04c606a3f05e664"
+    },
+    {
+      "path": "acceptance-evidence/dsh-managed-profile.json",
+      "sha256": "db399f1f1c19439c394f91919564b2c231f646a1ad0a2cdf82e6e2d614119140"
+    },
+    {
+      "path": "acceptance-evidence/dsh-managed-install.txt",
+      "sha256": "c9c13338eaa55c42b06ec4ec556f552e32706a043ee0f7349fb59fad1f4a5acc"
+    },
+    {
+      "path": "acceptance-evidence/dsh-windows-test.txt",
+      "sha256": "d6c4c19e49656ac173efe0ad53fbcba7d99da1ffcfe3da17b41eac0e679e5e25"
+    },
+    {
+      "path": "acceptance-evidence/dsh-linux-test.txt",
+      "sha256": "5006e2e68844a49487831cc024fe400c27c873946a6b6e4a8f1b3f6479d772ed"
+    },
+    {
+      "path": "acceptance-evidence/python-test.txt",
+      "sha256": "cce454e20d0ff15761b8a21bfc3163c456b470a40d293189bd031fdfb73249a2"
+    },
+    {
+      "path": "acceptance-evidence/dsh-market-alpha3.json",
+      "sha256": "dbd8970470cc3c3de7ef3b24ee0017da7f5fb7b26704e7918860d153b3e141bf"
+    },
+    {
+      "path": "acceptance-evidence/alpha3-sync-checks.json",
+      "sha256": "ab9cfc7710b0af7187715aad70d77abb3c3a4cb1b4240158fb626ad7deb05d1c"
+    },
+    {
+      "path": "acceptance-evidence/alpha3-sync-test-gate.txt",
+      "sha256": "6bd0f0670941e8634723a9ac7e3632d9a8dd95b6f39acdd7a71cbdedf1411bdf"
+    }
+  ],
+  "versions": {
+    "core": "0.1.0a10",
+    "learning": "0.1.0a10",
+    "dsh_plugin": "0.1.0-alpha.3"
+  }
+}

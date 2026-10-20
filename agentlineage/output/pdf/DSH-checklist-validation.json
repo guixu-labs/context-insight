@@ -1,0 +1,33 @@
+{
+  "version": "v0.9",
+  "rule_version": "v2",
+  "pages": 2,
+  "default_check_ids": [
+    "L01",
+    "L02",
+    "L03",
+    "L04",
+    "L05"
+  ],
+  "conditional_check_ids": [
+    "E01",
+    "E02",
+    "E03",
+    "E04",
+    "E05",
+    "E06"
+  ],
+  "template_matches_appendix": true,
+  "intake_template_matches_appendix": true,
+  "source_references_checked": 71,
+  "errors": [],
+  "visual_review": {
+    "status": "passed",
+    "pages_reviewed": 2,
+    "all_default_checks_on_page": 1,
+    "method": "Both rendered pages reviewed at full size, including repeated table header and AI instructions."
+  },
+  "sha256": "85411b1ac45a2cb3ae30e86fa1fbdb3044c0a4b46b14de3ac3fa8c786f8c03b4",
+  "template_sha256": "15c39f8fa422011c691427eed120a44930bdabdb8fc228bac2c6c1b284e4186f",
+  "scope": "Document and template validation only; no component has been marked complete and no DSH invocation performed."
+}

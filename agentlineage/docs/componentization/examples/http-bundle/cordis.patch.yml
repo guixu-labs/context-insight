@@ -1,0 +1,5 @@
+- insert:
+    - id: team.component.demo
+      name: '@team/component-demo'
+      config:
+        baseUrl: http://127.0.0.1:8120

@@ -1,0 +1,2112 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AgentLineage Core API",
+    "version": "0.1.0-draft",
+    "description": "2026-10-08 组件设计草案，尚未实施。运行与调查语义见 README。operation-specific result shapes、生产鉴权和兼容矩阵需实施前冻结；不得据此声称现有 API 已支持。"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8110",
+      "description": "建议的本地独立服务地址，可配置"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/v1/capabilities": {
+      "get": {
+        "operationId": "getCoreCapabilities",
+        "summary": "能力、版本和来源支持",
+        "x-required-scopes": [
+          "trace:read"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Capabilities"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/runs": {
+      "post": {
+        "operationId": "createRun",
+        "summary": "创建通用任务",
+        "x-required-scopes": [
+          "trace:write"
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "同一主体/路由下重复 key 与相同请求返回原结果；不同请求返回 409。保留期至少 7 天且覆盖作业终态后 7 天。",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRun"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/runs/{run_id}": {
+      "get": {
+        "operationId": "getRun",
+        "summary": "读取任务与材料完整性",
+        "x-required-scopes": [
+          "trace:read"
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sources": {
+      "post": {
+        "operationId": "uploadSource",
+        "summary": "上传不可变原始对象；明确授权的单个对象，不接受服务端路径或任意 URL",
+        "x-required-scopes": [
+          "trace:write"
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "同一主体/路由下重复 key 与相同请求返回原结果；不同请求返回 409。保留期至少 7 天且覆盖作业终态后 7 天。",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "claude",
+                "codex",
+                "deveco-export",
+                "generic-events"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Immutable source",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Source"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/runs/{run_id}/imports": {
+      "post": {
+        "operationId": "importSources",
+        "summary": "校验并索引已上传来源",
+        "x-required-scopes": [
+          "trace:write"
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "同一主体/路由下重复 key 与相同请求返回原结果；不同请求返回 409。保留期至少 7 天且覆盖作业终态后 7 天。",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted; read job or investigation status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/runs/{run_id}/events": {
+      "post": {
+        "operationId": "ingestEvents",
+        "summary": "摄入通用事件，按 producer 和事件 ID 去重",
+        "x-required-scopes": [
+          "trace:write"
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "同一主体/路由下重复 key 与相同请求返回原结果；不同请求返回 409。保留期至少 7 天且覆盖作业终态后 7 天。",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventBatch"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/runs/{run_id}/snapshots": {
+      "post": {
+        "operationId": "createSnapshot",
+        "summary": "冻结持久化水位；未指定范围则冻结已提交的当前范围",
+        "x-required-scopes": [
+          "trace:write"
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "同一主体/路由下重复 key 与相同请求返回原结果；不同请求返回 409。保留期至少 7 天且覆盖作业终态后 7 天。",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnapshotInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/snapshots/{snapshot_id}": {
+      "get": {
+        "operationId": "getSnapshot",
+        "summary": "读取固定材料与派生版本",
+        "x-required-scopes": [
+          "trace:read"
+        ],
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/runs/{run_id}/trace": {
+      "get": {
+        "operationId": "getTrace",
+        "summary": "分页轨迹；无 snapshot_id 时选择最近已提交快照并返回其 ID",
+        "x-required-scopes": [
+          "trace:read"
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "snapshot_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trace"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/query": {
+      "post": {
+        "operationId": "queryEvidence",
+        "summary": "只读批量调查；逐项返回 partial/error",
+        "x-required-scopes": [
+          "trace:read"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/reports/check": {
+      "post": {
+        "operationId": "checkReport",
+        "summary": "机械检查；语义状态固定未审查，不等于因果认证",
+        "x-required-scopes": [
+          "trace:read"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportCheck"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportInput"
+              }
+            }
+          }
+        },
+        "description": "可返回有期限的反馈回执以支持后续模型补充关系；不改原始事实，不把查询当成已经审阅。反馈仅限同主体、快照和报告修订链。"
+      }
+    },
+    "/v1/reports": {
+      "post": {
+        "operationId": "saveReport",
+        "summary": "保存不可变报告修订与校验结果",
+        "x-required-scopes": [
+          "trace:write"
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "同一主体/路由下重复 key 与相同请求返回原结果；不同请求返回 409。保留期至少 7 天且覆盖作业终态后 7 天。",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/reports/{report_id}": {
+      "get": {
+        "operationId": "getReport",
+        "summary": "报告与证据树",
+        "x-required-scopes": [
+          "trace:read"
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/exports": {
+      "post": {
+        "operationId": "createExport",
+        "summary": "按权限与脱敏策略异步导出",
+        "x-required-scopes": [
+          "export:read"
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "同一主体/路由下重复 key 与相同请求返回原结果；不同请求返回 409。保留期至少 7 天且覆盖作业终态后 7 天。",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted; read job or investigation status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Export"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/exports/{export_id}": {
+      "get": {
+        "operationId": "getExport",
+        "summary": "查询导出及受控下载链接",
+        "x-required-scopes": [
+          "export:read"
+        ],
+        "parameters": [
+          {
+            "name": "export_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Export"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}": {
+      "get": {
+        "operationId": "getJob",
+        "summary": "索引或导出状态",
+        "x-required-scopes": [
+          "trace:read"
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/cancel": {
+      "post": {
+        "operationId": "cancelJob",
+        "summary": "请求取消；返回实际状态",
+        "x-required-scopes": [
+          "trace:write"
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "同一主体/路由下重复 key 与相同请求返回原结果；不同请求返回 409。保留期至少 7 天且覆盖作业终态后 7 天。",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted; read job or investigation status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/422/429/503 structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/streams": {
+      "get": {
+        "operationId": "streamRun",
+        "summary": "SSE 进度通知；断线后以 cursor 恢复，过期 410",
+        "x-required-scopes": [
+          "trace:read"
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "事件包含 id、event、data；事实应通过查询接口重新读取",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Cursor expired; obtain latest snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "令牌主体具有租户/项目授权；每项操作的 x-required-scopes 由服务端执行。"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "retryable",
+          "request_id"
+        ],
+        "additionalProperties": false
+      },
+      "Gap": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "Capabilities": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "package_version": {
+            "type": "string"
+          },
+          "api_version": {
+            "type": "string"
+          },
+          "schema_versions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "adapters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "features": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "version",
+                "features"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "component",
+          "package_version",
+          "api_version",
+          "schema_versions",
+          "features",
+          "adapters"
+        ],
+        "additionalProperties": false
+      },
+      "EvidenceRef": {
+        "type": "object",
+        "properties": {
+          "snapshot_id": {
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "record_id": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "json_pointer": {
+            "type": "string"
+          },
+          "content_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "source_id",
+          "content_sha256"
+        ],
+        "additionalProperties": false
+      },
+      "Budget": {
+        "type": "object",
+        "properties": {
+          "max_model_calls": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_input_tokens": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "max_model_calls",
+          "max_input_tokens",
+          "max_output_tokens",
+          "timeout_seconds"
+        ],
+        "additionalProperties": false
+      },
+      "Job": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "cancel_requested",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "stage": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "result": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "error": {
+            "$ref": "#/components/schemas/Error"
+          },
+          "links": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "Page": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "CreateRun": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "external_key": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "labels": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "project_id",
+          "external_key",
+          "objective"
+        ],
+        "additionalProperties": false
+      },
+      "Run": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "external_key": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "completed",
+              "failed",
+              "cancelled",
+              "unknown"
+            ]
+          },
+          "latest_snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completeness": {
+            "enum": [
+              "complete",
+              "partial",
+              "unknown"
+            ]
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Gap"
+            }
+          },
+          "links": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "external_key",
+          "status",
+          "completeness",
+          "gaps"
+        ],
+        "additionalProperties": false
+      },
+      "Source": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "claude",
+              "codex",
+              "deveco-export",
+              "generic-events"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "format",
+          "sha256",
+          "size_bytes"
+        ],
+        "additionalProperties": false
+      },
+      "ImportInput": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source_id": {
+                  "type": "string"
+                },
+                "role": {
+                  "enum": [
+                    "root",
+                    "child",
+                    "artifact",
+                    "metadata"
+                  ]
+                },
+                "native_session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "declared_complete": {
+            "type": "boolean",
+            "description": "A caller declaration, not proof; the service checks material inventory, lineage and sequence gaps."
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Gap"
+            }
+          }
+        },
+        "required": [
+          "sources",
+          "declared_complete"
+        ],
+        "additionalProperties": false
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "type": {
+            "enum": [
+              "run.started",
+              "run.completed",
+              "run.failed",
+              "run.cancelled",
+              "session.started",
+              "session.finished",
+              "actor.delegated",
+              "message.observed",
+              "tool.requested",
+              "tool.completed",
+              "artifact.changed",
+              "verification.reported"
+            ]
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "sequence",
+          "occurred_at",
+          "type",
+          "payload"
+        ],
+        "additionalProperties": false
+      },
+      "EventBatch": {
+        "type": "object",
+        "properties": {
+          "producer_id": {
+            "type": "string",
+            "description": "Authorized source identity; deduplicate by tenant, producer_id and event.id."
+          },
+          "schema_version": {
+            "type": "string"
+          },
+          "events": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          }
+        },
+        "required": [
+          "producer_id",
+          "schema_version",
+          "events"
+        ],
+        "additionalProperties": false
+      },
+      "EventReceipt": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "duplicate": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "ingest_watermark": {
+            "type": "string"
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Gap"
+            }
+          }
+        },
+        "required": [
+          "accepted",
+          "duplicate",
+          "ingest_watermark",
+          "gaps"
+        ],
+        "additionalProperties": false
+      },
+      "SnapshotInput": {
+        "type": "object",
+        "properties": {
+          "source_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "event_watermark": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "Snapshot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "source_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "event_watermark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "parser_versions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "index_schema_version": {
+            "type": "string"
+          },
+          "completeness": {
+            "enum": [
+              "complete",
+              "partial",
+              "unknown"
+            ]
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Gap"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "source_ids",
+          "at",
+          "parser_versions",
+          "index_schema_version",
+          "completeness",
+          "gaps"
+        ],
+        "additionalProperties": false
+      },
+      "Trace": {
+        "type": "object",
+        "properties": {
+          "snapshot_id": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completeness": {
+            "enum": [
+              "complete",
+              "partial",
+              "unknown"
+            ]
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Gap"
+            }
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "items",
+          "next_cursor",
+          "completeness",
+          "gaps"
+        ],
+        "additionalProperties": false
+      },
+      "QueryItem": {
+        "type": "object",
+        "properties": {
+          "op": {
+            "enum": [
+              "catalog",
+              "file",
+              "agent",
+              "search",
+              "open",
+              "blame",
+              "diff",
+              "neighbors",
+              "review"
+            ]
+          },
+          "key": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "view": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "terms": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence_ref": {
+            "$ref": "#/components/schemas/EvidenceRef"
+          },
+          "left": {
+            "$ref": "#/components/schemas/EvidenceRef"
+          },
+          "right": {
+            "$ref": "#/components/schemas/EvidenceRef"
+          },
+          "report_id": {
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "upstream",
+              "downstream",
+              "both"
+            ]
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "op": {
+                  "enum": [
+                    "file",
+                    "agent",
+                    "blame",
+                    "neighbors"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "key",
+                "at"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "op": {
+                  "const": "search"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "scope",
+                "terms"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "op": {
+                  "const": "open"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "evidence_ref"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "op": {
+                  "const": "diff"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "left",
+                "right"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "op": {
+                  "const": "review"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "report_id"
+              ]
+            }
+          }
+        ]
+      },
+      "QueryInput": {
+        "type": "object",
+        "properties": {
+          "snapshot_id": {
+            "type": "string"
+          },
+          "requests": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 24,
+            "items": {
+              "$ref": "#/components/schemas/QueryItem"
+            }
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "requests"
+        ],
+        "additionalProperties": false
+      },
+      "QueryResult": {
+        "type": "object",
+        "properties": {
+          "request_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "partial",
+              "error"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Gap"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "$ref": "#/components/schemas/Error"
+          }
+        },
+        "required": [
+          "request_index",
+          "status",
+          "items",
+          "gaps",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "QueryResponse": {
+        "type": "object",
+        "properties": {
+          "snapshot_id": {
+            "type": "string"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryResult"
+            }
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "results"
+        ],
+        "additionalProperties": false
+      },
+      "ReportDocument": {
+        "type": "object",
+        "properties": {
+          "snapshot_id": {
+            "type": "string"
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string"
+                },
+                "to": {
+                  "type": "string"
+                },
+                "relation": {
+                  "type": "string"
+                },
+                "evidence_kind": {
+                  "enum": [
+                    "native_receipt",
+                    "deterministic_replay",
+                    "model_review",
+                    "human_assertion"
+                  ]
+                },
+                "evidence_refs": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EvidenceRef"
+                  }
+                },
+                "assertion": {
+                  "type": "string"
+                },
+                "limitations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "from",
+                "to",
+                "relation",
+                "evidence_kind",
+                "evidence_refs"
+              ],
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "evidence_kind": {
+                        "enum": [
+                          "model_review",
+                          "human_assertion"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "assertion",
+                      "limitations"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "unknown": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "target",
+          "findings",
+          "nodes",
+          "edges",
+          "unknown"
+        ],
+        "additionalProperties": false
+      },
+      "ReportInput": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/ReportDocument"
+          },
+          "revision_of": {
+            "type": "string"
+          },
+          "feedback_id": {
+            "type": "string",
+            "description": "Opaque prior-check receipt, restricted to the same principal, snapshot and revision chain."
+          }
+        },
+        "required": [
+          "document"
+        ],
+        "additionalProperties": false
+      },
+      "ReportCheck": {
+        "type": "object",
+        "properties": {
+          "structural_status": {
+            "enum": [
+              "valid",
+              "needs_revision"
+            ]
+          },
+          "semantic_status": {
+            "const": "not_reviewed"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "unverified_edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "feedback_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "structural_status",
+          "semantic_status",
+          "issues",
+          "unverified_edges",
+          "coverage"
+        ],
+        "additionalProperties": false
+      },
+      "Report": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "revision_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "document": {
+            "$ref": "#/components/schemas/ReportDocument"
+          },
+          "check": {
+            "$ref": "#/components/schemas/ReportCheck"
+          },
+          "links": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "document",
+          "check"
+        ],
+        "additionalProperties": false
+      },
+      "ExportInput": {
+        "type": "object",
+        "properties": {
+          "snapshot_id": {
+            "type": "string"
+          },
+          "report_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "format": {
+            "enum": [
+              "html",
+              "json"
+            ]
+          },
+          "redaction_profile": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "format"
+        ],
+        "additionalProperties": false
+      },
+      "Export": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "ready",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "download_url": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "job_id",
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

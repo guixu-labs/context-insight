@@ -1,0 +1,18 @@
+
+ RUN  v3.2.7 D:/work/AgentLineage/.work/context-insight
+
+ ✓ |insight| tests/ut/lineage-api.test.ts > imports through Insight, freezes exact bytes, resolves and rereads evidence through Core 138ms
+ ✓ |insight| tests/ut/lineage-api.test.ts > rejects stale material anchors and reports absent coordinates without guessing 24ms
+ ✓ |insight| tests/ut/lineage-api.test.ts > keeps old snapshots readable when the registered source changes 88ms
+ ✓ |insight| tests/ut/lineage-api.test.ts > does not bind a proxy sibling with the same taskId as native evidence 16ms
+ ✓ |insight| tests/ut/lineage-api.test.ts > enforces import roots before reading a registered source 2ms
+ ✓ |insight| tests/ut/lineage-api.test.ts > preserves Core errors, raw uploads and idempotency conflicts 14ms
+ ✓ |insight| tests/ut/lineage-api.test.ts > preserves live append acknowledgments, conflict handling, cursors and frozen bytes 89ms
+ ✓ |insight| tests/ut/lineage-api.test.ts > fails clearly when disabled, unauthorized or configured with an unsafe URL 2ms
+ ✓ |insight| tests/ut/lineage-api.test.ts > bounds slow requests and refuses upstream redirects 72ms
+ ✓ |insight| tests/ut/lineage-api.test.ts > propagates caller cancellation as a cancelled result 1ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  11:16:40
+   Duration  1.54s (transform 209ms, setup 60ms, collect 327ms, tests 726ms, environment 0ms, prepare 92ms)

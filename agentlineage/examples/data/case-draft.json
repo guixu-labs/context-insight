@@ -1,0 +1,44 @@
+{
+  "title": "Preserve the specified spacing",
+  "when": "Implementing an explicit requirement",
+  "description": "Synthetic example, not a production investigation",
+  "summary": "The worker read spacing=4, wrote spacing=8; a fixer later changed it to 4.",
+  "recommendations": [
+    "Compare the output against the recorded requirement"
+  ],
+  "unknown": [
+    "No build or device verification is recorded in this fixture"
+  ],
+  "graphs": [
+    {
+      "target": {
+        "key": "/demo/view.py",
+        "since": "2026-01-01T00:00:05Z",
+        "at": "2026-01-01T00:00:09Z"
+      },
+      "nodes": [
+        {
+          "key": "/demo/spec.md",
+          "at": "2026-01-01T00:00:02Z",
+          "reason": "Recorded requirement"
+        },
+        {
+          "key": "demo-session:worker",
+          "at": "2026-01-01T00:00:04Z",
+          "reason": "Wrote a different value",
+          "problem": true
+        }
+      ],
+      "edges": [
+        {
+          "from": 1,
+          "to": 2
+        },
+        {
+          "from": 2,
+          "to": "target"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,112 @@
+{
+  "input_fixture": "tests/data/lineage/native.jsonl",
+  "binding": {
+    "contract": "context-insight.lineage-binding/v1",
+    "session_id": "cmveonm0c0000qqg85xn6xdc1",
+    "task_id": "lineage-merge-fixture",
+    "framework": "claude-code",
+    "source_version": null,
+    "insight_version": "0.2.38",
+    "insight_updated_at": "2026-10-19T03:16:41.388Z",
+    "source_sha256": "0b47c644bc8d8854509695e43d72026795a7087ad9f2a83cc82b2d865b811ef9",
+    "projection_alignment": "unverified",
+    "semantic_verified": false
+  },
+  "source": {
+    "format": "claude",
+    "id": "src_80c8240e2d9b2759f08d1a486564e470fd111009d0f589501d073b5c416b17ef",
+    "index_sha256": "0b47c644bc8d8854509695e43d72026795a7087ad9f2a83cc82b2d865b811ef9",
+    "name": "claude.jsonl",
+    "projection": null,
+    "sha256": "0b47c644bc8d8854509695e43d72026795a7087ad9f2a83cc82b2d865b811ef9",
+    "size_bytes": 803
+  },
+  "snapshot": {
+    "at": "2026-01-01T00:00:02+00:00",
+    "completeness": "partial",
+    "context": {
+      "insight": {
+        "contract": "context-insight.lineage-binding/v1",
+        "framework": "claude-code",
+        "insight_updated_at": "2026-10-19T03:16:41.388Z",
+        "insight_version": "0.2.38",
+        "projection_alignment": "unverified",
+        "semantic_verified": false,
+        "session_id": "cmveonm0c0000qqg85xn6xdc1",
+        "source_sha256": "0b47c644bc8d8854509695e43d72026795a7087ad9f2a83cc82b2d865b811ef9",
+        "source_version": null,
+        "task_id": "lineage-merge-fixture"
+      }
+    },
+    "gaps": [
+      {
+        "code": "primary-source-only",
+        "message": "Only the registered primary source is frozen; child sources and Insight projection alignment are not established"
+      }
+    ],
+    "id": "snap_612d588e4139b08aca114d7482f84490a68daa1572c9ed88dc92605e6fa1ba53",
+    "index_schema": "inquiry/index/6",
+    "parser_version": "0.1.0a9",
+    "platforms": [
+      "claude"
+    ],
+    "records": 3,
+    "run_id": "run_c16dbd81b68645f79b255eb3b4cdf158",
+    "source_ids": [
+      "src_80c8240e2d9b2759f08d1a486564e470fd111009d0f589501d073b5c416b17ef"
+    ],
+    "sources": [
+      {
+        "format": "claude",
+        "id": "src_80c8240e2d9b2759f08d1a486564e470fd111009d0f589501d073b5c416b17ef",
+        "index_sha256": "0b47c644bc8d8854509695e43d72026795a7087ad9f2a83cc82b2d865b811ef9",
+        "name": "claude.jsonl",
+        "projection": null,
+        "sha256": "0b47c644bc8d8854509695e43d72026795a7087ad9f2a83cc82b2d865b811ef9",
+        "size_bytes": 803
+      }
+    ]
+  },
+  "anchor": {
+    "source_id": "src_80c8240e2d9b2759f08d1a486564e470fd111009d0f589501d073b5c416b17ef",
+    "sha256": "0b47c644bc8d8854509695e43d72026795a7087ad9f2a83cc82b2d865b811ef9",
+    "pointer": "/lines/2"
+  },
+  "resolved": {
+    "contract": "agentlineage.evidence-anchor/v1",
+    "records": [
+      {
+        "evidence": {
+          "coordinate": "jsonl-line",
+          "pointer": "/lines/2",
+          "ref": "4d826798cbe36fdc:2:efdac4df778ea119",
+          "sha256": "0b47c644bc8d8854509695e43d72026795a7087ad9f2a83cc82b2d865b811ef9",
+          "source_id": "src_80c8240e2d9b2759f08d1a486564e470fd111009d0f589501d073b5c416b17ef"
+        },
+        "kind": "tool-call",
+        "record_id": "4d826798cbe36fdc:2:efdac4df778ea119:tool-call:1",
+        "session_id": "lineage-merge-fixture:main"
+      }
+    ],
+    "semantic_verified": false,
+    "snapshot_id": "snap_612d588e4139b08aca114d7482f84490a68daa1572c9ed88dc92605e6fa1ba53",
+    "status": "resolved"
+  },
+  "opened": {
+    "contract": "agentlineage.observations/v1",
+    "evidence": {
+      "coordinate": "jsonl-line",
+      "pointer": "/lines/2",
+      "ref": "4d826798cbe36fdc:2:efdac4df778ea119",
+      "sha256": "0b47c644bc8d8854509695e43d72026795a7087ad9f2a83cc82b2d865b811ef9",
+      "source_id": "src_80c8240e2d9b2759f08d1a486564e470fd111009d0f589501d073b5c416b17ef"
+    },
+    "has_more": false,
+    "next_offset": 578,
+    "offset": 0,
+    "record_id": "4d826798cbe36fdc:2:efdac4df778ea119:tool-call:1",
+    "snapshot_id": "snap_612d588e4139b08aca114d7482f84490a68daa1572c9ed88dc92605e6fa1ba53",
+    "text": "{\"call_id\":\"lineage-write\",\"evidence\":{\"coordinate\":\"jsonl-line\",\"pointer\":\"/lines/2\",\"ref\":\"4d826798cbe36fdc:2:efdac4df778ea119\",\"sha256\":\"0b47c644bc8d8854509695e43d72026795a7087ad9f2a83cc82b2d865b811ef9\",\"source_id\":\"src_80c8240e2d9b2759f08d1a486564e470fd111009d0f589501d073b5c416b17ef\"},\"id\":\"4d826798cbe36fdc:2:efdac4df778ea119:tool-call:1\",\"input\":{\"content\":\"hello\\n\",\"file_path\":\"/project/hello.txt\"},\"kind\":\"tool-call\",\"parent_session_id\":null,\"provider\":\"claude\",\"session_id\":\"lineage-merge-fixture:main\",\"slot\":1,\"timestamp\":\"2026-01-01T00:00:01+00:00\",\"tool\":\"Write\"}",
+    "total_characters": 578
+  }
+}

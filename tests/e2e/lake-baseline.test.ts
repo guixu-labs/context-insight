@@ -196,7 +196,7 @@ describe('baseline：位置即身份（上传 → 落位 → 列表 → 交换 �
     git('git add .', SEED);
     git('git -c user.name=seed -c user.email=seed@t commit -q -m "manual baseline structure"', SEED);
     // bare 仓已被 upload 推进（SEED 停在 init）→ rebase 后再推
-    git('git pull --rebase -q origin main', SEED);
+    git('git -c user.name=seed -c user.email=seed@t pull --rebase -q origin main', SEED);
     git('git push -q origin main', SEED);
 
     const scoped = lake.listLakeSessions(cfgCustom);

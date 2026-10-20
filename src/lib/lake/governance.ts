@@ -7,8 +7,8 @@
 // See LICENSE in the root of the software repository for the full text of the License.
 
 // lake 上传治理：唯一强制关口，所有待传文件一律视为不可信输入。
-// redactor 核心自 proxy/src/redactor.ts 移植（该模块零内部依赖，两份实现由
-// tests/lake-governance.test.ts 的 parity 用例锁定字节一致，漂移即失败）。
+// redactor 核心自 proxy/src/redactor.ts 移植；固定脱敏契约由
+// tests/data/lake/redaction-contract.json 与 lake E2E 用例验证。
 // 之下的治理层（redactLine/scanResidue/governText）为 insight 侧独有：
 //   ① 清洗：jsonl 逐行 parse → 结构层键名 + 字符串层厂家特征打码（写副本，不改原件）
 //   ② 复检：对清洗产物独立重扫，任何残留命中 → 熔断拒绝上传（fail-closed）

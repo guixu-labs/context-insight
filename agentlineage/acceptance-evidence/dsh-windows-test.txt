@@ -1,0 +1,28 @@
+
+> @fuxi-ailabs/dsh-agentlineage@0.1.0-alpha.2 check
+> npm run build && npm test
+
+
+> @fuxi-ailabs/dsh-agentlineage@0.1.0-alpha.2 build
+> tsc -p tsconfig.json
+
+
+> @fuxi-ailabs/dsh-agentlineage@0.1.0-alpha.2 test
+> node --test tests/*.test.mjs
+
+✔ client consumes a real HTTP service with scoped authorization (25.1132ms)
+✔ DSH tools query a separately running Python Core (364.5255ms)
+✔ managed Core owns its port and native DSH sessions, snapshots, files and restart (1190.4451ms)
+✔ managed startup failure does not register tools or leave an owned Core (16.9788ms)
+✔ managed profiles allocate independent ports and reject a second owner of the same store (937.7315ms)
+✔ managed startup timeout terminates the actual spawned process (1073.9613ms)
+✔ actual DSH defineTool validates tools; writes require explicit configuration (3.1073ms)
+✔ credential-bearing clients reject unsafe endpoints (0.2153ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3461.4763

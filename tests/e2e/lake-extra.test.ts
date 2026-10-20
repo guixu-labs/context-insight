@@ -7,7 +7,7 @@
 // See LICENSE in the root of the software repository for the full text of the License.
 
 // lake v2 IT 扩展（与 lake.test.ts 互补）：镜像自愈（fetch 失败 →
-// 删库重建）、治理形态全覆盖 + parity、重复上传覆盖语义、并发上传串行
+// 删库重建）、治理形态全覆盖 + 固定输出、重复上传覆盖语义、并发上传串行
 // （withWriteLock mutex）、100MB 超限熔断。独立 bare 仓 + cache，taskId
 // 用 'cc-extra-' 前缀避免与 lake.test.ts 冲突。env 必须在 lake 模块
 // 加载前设置（mirror.ts 在模块顶层读取 env）。
@@ -19,7 +19,8 @@ import { execSync } from 'node:child_process';
 import { readCaptureText } from '../../src/lib/compression.ts';
 import { PrismaClient } from '@prisma/client';
 import { importSession } from '../../src/lib/ingest/data-service.ts';
-import { seedLakeConfig, switchLakeConfig } from '../helpers/lake-env';
+import { seedLakeConfig } from '../helpers/lake-env';
+import redactionContract from '../data/lake/redaction-contract.json';
 
 function git(cmd: string, cwd: string): void {
   execSync(cmd, { cwd, stdio: 'pipe', timeout: 60_000 });
@@ -52,7 +53,6 @@ const prisma = new PrismaClient();
 const lake = await import('../../src/lib/lake');
 const mirror = await import('../../src/lib/lake/mirror');
 const governance = await import('../../src/lib/lake/governance');
-const proxyRedactor = await import('../../../cpx/src/redactor');
 
 const EXTRA_SIDS: string[] = [];
 
@@ -119,70 +119,52 @@ describe('lake 镜像自愈：fetch 失败 → 删库重建', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────
-describe('lake 治理形态全覆盖 + parity（与 proxy/src/redactor.ts 字节一致）', () => {
-  // 厂家前缀键：覆盖 governance STRING_RULES 第 5 条全部 9 种前缀
-  const KEY_FORMS = [
-    'sk-ant-api03-AAAA1111BBBB2222CCCC3333DDDD4444EEEE5', // anthropic
-    'sk-or-aaaabbbbcccc1111222233334444',                  // openrouter
-    'sk-proj-aaaabbbbcccc1111222233334444',                // openai project
-    'sk-svcacct-aaaabbbbcccc1111222233334444',             // openai service account
-    'gsk_' + 'a'.repeat(25),                                // groq (gsk_ + 20+)
-    'AIza' + 'A'.repeat(35),                                // google (AIza + 30+)
-    'xai-1234567890abcdef1',                                // xai (xai- + 16+)
-    'GL-' + 'C'.repeat(30),                                 // zhipu bigmodel (GL- + 28+)
-    'LTAIABCD1234EFGH5678IJKL',                             // aliyun dashscope (LTAI + 12+)
-    'sk-' + 'a'.repeat(40),                                 // DeepSeek/Moonshot/OpenAI legacy (sk- + 28+)
-    'abcdef0123456789abcdef0123456789.abcdefghijklmnop',   // zhipu bigmodel 32hex.16-20
-    'Bearer AAAABBBBCCCCDDDD12345678',                      // Bearer 凭据
-  ];
-
-  it('每个厂家前缀键：清洗后无明文 + 复检零残留 + parity', () => {
-    for (const key of KEY_FORMS) {
-      const text = `配置 dump: ${key}`;
+describe('lake 治理形态全覆盖 + fixed redaction contract', () => {
+  it('每个厂家前缀键：固定输出 + 无明文 + 复检零残留', () => {
+    for (const { input, expected } of redactionContract.vendors) {
+      const text = `配置 dump: ${input}`;
       const { output, residue } = governance.governText(JSON.stringify({ content: text }));
-      expect(residue, `residue should be empty for ${key}`).toEqual([]);
-      expect(output, `output should not contain ${key}`).not.toContain(key);
-      // parity：两份实现字节一致
-      expect(governance.redactString(text)).toBe(proxyRedactor.redactString(text));
+      expect(residue).toEqual([]);
+      expect(JSON.parse(output)).toEqual({ content: `配置 dump: ${expected}` });
+      expect(output).not.toContain(input);
+      expect(governance.redactString(text)).toBe(`配置 dump: ${expected}`);
     }
   });
 
-  it('env 回显形态：ANTHROPIC_API_KEY=xxx 清洗打码 + parity', () => {
+  it('env 回显形态：ANTHROPIC_API_KEY=xxx 清洗打码 + 固定输出', () => {
     const text = 'ANTHROPIC_API_KEY=sk-ant-api03-ZZZZ9999YYYY8888XXXX7777';
     const { output, residue } = governance.governText(text);
     expect(residue).toEqual([]);
     expect(output).not.toContain('sk-ant-api03-ZZZZ9999');
     expect(output).toContain('…');
-    expect(governance.redactString(text)).toBe(proxyRedactor.redactString(text));
+    expect(governance.redactString(text)).toBe('ANTHROPIC_API_KEY=sk-a…7777');
   });
 
-  it('JSON 字段形态："api_key":"xxx" 清洗打码 + parity', () => {
+  it('JSON 字段形态："api_key":"xxx" 清洗打码 + 固定输出', () => {
     const text = '{"api_key":"0123456789abcdef0123456789abcdef.abcdef123456"}';
     const { output, residue } = governance.governText(text);
     expect(residue).toEqual([]);
     expect(output).not.toContain('0123456789abcdef0123456789abcdef');
-    expect(governance.redactString(text)).toBe(proxyRedactor.redactString(text));
+    expect(governance.redactString(text)).toBe('{"api_key":"0123…3456"}');
   });
 
-  it('URL query 形态：?key=AIza... 清洗打码 + parity', () => {
+  it('URL query 形态：?key=AIza... 清洗打码 + 固定输出', () => {
     const text = 'https://example.com/v1?key=AIzaSyA' + 'B'.repeat(30);
     const { output, residue } = governance.governText(text);
     expect(residue).toEqual([]);
     expect(output).not.toContain('AIzaSyA' + 'B'.repeat(30));
-    expect(governance.redactString(text)).toBe(proxyRedactor.redactString(text));
+    expect(governance.redactString(text)).toBe('https://example.com/v1?key=AIza…BBBB');
   });
 
-  it('结构层键名：authorization / api_key / password 深度遍历打码 + parity', () => {
+  it('结构层键名：authorization / api_key / password 深度遍历打码 + 固定输出', () => {
     const deep = {
       authorization: 'Bearer secretcredential123456',
       nested: { api_key: 'plainvalue1234567890', password: 'mypass12345678' },
       list: ['sk-ant-api03-ZZZZ9999YYYY8888XXXX7777'],
     };
     const a = structuredClone(deep);
-    const b = structuredClone(deep);
     expect(governance.redactInPlace(a)).toBe(true);
-    expect(proxyRedactor.redactInPlace(b)).toBe(true);
-    expect(a).toEqual(b); // parity
+    expect(a).toEqual({ authorization: 'Bearer secr…3456', nested: { api_key: 'plai…7890', password: 'mypa…5678' }, list: ['sk-a…7777'] });
     expect(a.nested.api_key).not.toBe('plainvalue1234567890');
     expect(a.nested.password).not.toBe('mypass12345678');
     expect(a.authorization).not.toBe('Bearer secretcredential123456');

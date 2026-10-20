@@ -1,0 +1,22 @@
+services:
+  core:
+    build:
+      context: ..
+      dockerfile: deploy/core.Dockerfile
+    ports: ["127.0.0.1:8110:8110"]
+    volumes: ["core-data:/data"]
+    environment:
+      AGENTLINEAGE_TOKEN: ${AGENTLINEAGE_TOKEN:?Set a Core workspace token}
+  learning:
+    profiles: ["learning"]
+    build:
+      context: ..
+      dockerfile: deploy/learning.Dockerfile
+    ports: ["127.0.0.1:8111:8111"]
+    volumes: ["learning-data:/data"]
+    environment:
+      AGENTLINEAGE_LEARNING_TOKEN: ${AGENTLINEAGE_LEARNING_TOKEN:?Set a Learning token}
+      AGENTLINEAGE_PUBLISH_TOKEN: ${AGENTLINEAGE_PUBLISH_TOKEN:?Set a separate publication token}
+volumes:
+  core-data:
+  learning-data:

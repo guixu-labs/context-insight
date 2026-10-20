@@ -1,0 +1,9 @@
+- insert:
+    - id: team.component.combo.health
+      name: '@team/component-http-skills-demo/health'
+      config:
+        baseUrl: http://127.0.0.1:8120
+    - id: team.component.combo.skills
+      name: '@team/component-http-skills-demo/skills'
+      disabled: true
+      config: {}

@@ -230,7 +230,7 @@ describe('范式网关：必填 + 动态白名单 + 自定义远端拦截', () =
     execSync(`git -c user.name=t -c user.email=t@t commit -q -m seed`, { cwd: seedDir, stdio: 'pipe' });
     // BARE 已有 main 分支：fetch 已有历史 + merge 允许无关历史 + push
     execSync(`git fetch -q "${BARE}" main`, { cwd: seedDir, stdio: 'pipe' });
-    execSync(`git merge -q --allow-unrelated-histories -m merge FETCH_HEAD`, { cwd: seedDir, stdio: 'pipe' });
+    execSync(`git -c user.name=seed -c user.email=seed@t merge -q --allow-unrelated-histories -m merge FETCH_HEAD`, { cwd: seedDir, stdio: 'pipe' });
     execSync(`git push -q "${BARE}" main`, { cwd: seedDir, stdio: 'pipe' });
     // 镜像需强制刷新（cache TTL / 新 commit 推入后 fetch 可见）
     await expect(() => mirror.materializeSession(SID_P2)).toThrow(/multiple locations/);

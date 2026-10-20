@@ -35,6 +35,7 @@
     "test:report:html": "vitest run --reporter=html --outputFile=test-report/index.html",
     "test:report:serve": "vite preview --outDir test-report --port 21031 --host",
     "test:e2e": "node scripts/ensure-native.mjs && node scripts/ensure-test-db.mjs && vitest run tests/e2e",
+    "pretest:all": "npm run pretest",
     "test:all": "vitest run"
   },
   "dependencies": {

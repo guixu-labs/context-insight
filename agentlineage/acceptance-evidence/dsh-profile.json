@@ -1,0 +1,51 @@
+{
+  "dsh_version": "0.2.1-rc.2",
+  "profile": "lineage-current",
+  "visible": [
+    "lineage_query",
+    "lineage_open",
+    "lineage_check"
+  ],
+  "success": {
+    "isError": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"results\":[{\"request_index\":0,\"result\":{\"catalog_kind\":\"file\",\"kind\":\"catalog\",\"next\":null,\"rows\":[{\"key\":\"/project/hello.txt\"}],\"total\":1},\"status\":\"ok\"}],\"snapshot_id\":\"snap_a29d8f3e9fa7fc678cc2266a30e70521fb4061436e5ef214d274025d005fbbf5\"}"
+      }
+    ],
+    "value": {
+      "results": [
+        {
+          "request_index": 0,
+          "result": {
+            "catalog_kind": "file",
+            "kind": "catalog",
+            "next": null,
+            "rows": [
+              {
+                "key": "/project/hello.txt"
+              }
+            ],
+            "total": 1
+          },
+          "status": "ok"
+        }
+      ],
+      "snapshot_id": "snap_a29d8f3e9fa7fc678cc2266a30e70521fb4061436e5ef214d274025d005fbbf5"
+    }
+  },
+  "failure": {
+    "isError": true,
+    "error": {
+      "message": "AgentLineage request failed (HTTP 404)"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Error: AgentLineage request failed (HTTP 404)"
+      }
+    ]
+  },
+  "model_called": false
+}

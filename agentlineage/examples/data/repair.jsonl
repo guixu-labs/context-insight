@@ -1,0 +1,2 @@
+{"sessionId":"demo-session","agentId":"fixer","cwd":"/demo","type":"assistant","timestamp":"2026-01-01T00:00:06Z","message":{"content":[{"type":"tool_use","id":"fixer-6","name":"Edit","input":{"file_path":"/demo/view.py","old_string":"spacing=8","new_string":"spacing=4"}}]}}
+{"sessionId":"demo-session","agentId":"fixer","cwd":"/demo","type":"user","timestamp":"2026-01-01T00:00:07Z","message":{"content":[{"type":"tool_result","tool_use_id":"fixer-6","content":"ok"}]}}

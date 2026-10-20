@@ -1,0 +1,113 @@
+{
+  "contract": "insight.redaction/v1",
+  "strings": [
+    {
+      "name": "combined",
+      "input": "key 是 sk-ant-api03-AAAA1111BBBB2222CCCC3333DDDD4444EEEE5，DASHSCOPE_API_KEY=LTAIABCD1234EFGH5678IJKL，头 \"Bearer AAAABBBBCCCCDDDD12345678\"",
+      "expected": "key 是 sk-a…EEE5，DASHSCOPE_API_KEY=LTAI…IJKL，头 \"Bearer AAAA…5678\""
+    },
+    {
+      "name": "json",
+      "input": "\"api_key\": \"0123456789abcdef0123456789abcdef.abcdef123456\"",
+      "expected": "\"api_key\": \"0123…3456\""
+    },
+    {
+      "name": "vendors",
+      "input": "gsk_AAAABBBBCCCCDDDDEEEEFFFF12345678 / AIzaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA / xai-1234567890abcdef1",
+      "expected": "gsk_…5678 / AIza…AAAA / xai-…def1"
+    },
+    {
+      "name": "query",
+      "input": "https://example.com/v1?key=AIzaSyABBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+      "expected": "https://example.com/v1?key=AIza…BBBB"
+    },
+    {
+      "name": "zhipu",
+      "input": "GL-CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+      "expected": "GL-C…CCCC"
+    },
+    {
+      "name": "unchanged",
+      "input": "max_tokens=4096, tool_use_id=toolu_1, input_tokens=100（零误伤基准）",
+      "expected": "max_tokens=4096, tool_use_id=toolu_1, input_tokens=100（零误伤基准）"
+    }
+  ],
+  "vendors": [
+    {
+      "input": "sk-ant-api03-AAAA1111BBBB2222CCCC3333DDDD4444EEEE5",
+      "expected": "sk-a…EEE5"
+    },
+    {
+      "input": "sk-or-aaaabbbbcccc1111222233334444",
+      "expected": "sk-o…4444"
+    },
+    {
+      "input": "sk-proj-aaaabbbbcccc1111222233334444",
+      "expected": "sk-p…4444"
+    },
+    {
+      "input": "sk-svcacct-aaaabbbbcccc1111222233334444",
+      "expected": "sk-s…4444"
+    },
+    {
+      "input": "gsk_aaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "gsk_…aaaa"
+    },
+    {
+      "input": "AIzaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "expected": "AIza…AAAA"
+    },
+    {
+      "input": "xai-1234567890abcdef1",
+      "expected": "xai-…def1"
+    },
+    {
+      "input": "GL-CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+      "expected": "GL-C…CCCC"
+    },
+    {
+      "input": "LTAIABCD1234EFGH5678IJKL",
+      "expected": "LTAI…IJKL"
+    },
+    {
+      "input": "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "sk-a…aaaa"
+    },
+    {
+      "input": "abcdef0123456789abcdef0123456789.abcdefghijklmnop",
+      "expected": "abcd…mnop"
+    },
+    {
+      "input": "Bearer AAAABBBBCCCCDDDD12345678",
+      "expected": "Bearer AAAA…5678"
+    }
+  ],
+  "object": {
+    "input": {
+      "authorization": "Bearer secretcredential123456",
+      "nested": {
+        "api_key": "plainvalue1234567890",
+        "password": "mypass12345678"
+      },
+      "list": [
+        "sk-ant-api03-ZZZZ9999YYYY8888XXXX7777"
+      ],
+      "max_tokens": 4096,
+      "tool_use_id": "toolu_1",
+      "token": "ordinary value"
+    },
+    "expected": {
+      "authorization": "Bearer secr…3456",
+      "nested": {
+        "api_key": "plai…7890",
+        "password": "mypa…5678"
+      },
+      "list": [
+        "sk-a…7777"
+      ],
+      "max_tokens": 4096,
+      "tool_use_id": "toolu_1",
+      "token": "ordinary value"
+    }
+  }
+}

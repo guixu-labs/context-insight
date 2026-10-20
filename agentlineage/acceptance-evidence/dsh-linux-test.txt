@@ -1,0 +1,32 @@
+
+> @fuxi-ailabs/dsh-agentlineage@0.1.0-alpha.2 check
+> npm run build && npm test
+
+
+> @fuxi-ailabs/dsh-agentlineage@0.1.0-alpha.2 build
+> tsc -p tsconfig.json
+
+
+> @fuxi-ailabs/dsh-agentlineage@0.1.0-alpha.2 test
+> node --test tests/*.test.mjs
+
+✔ client consumes a real HTTP service with scoped authorization (17.594557ms)
+(node:495) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ DSH tools query a separately running Python Core (133.803682ms)
+(node:506) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ managed Core owns its port and native DSH sessions, snapshots, files and restart (544.057048ms)
+✔ managed startup failure does not register tools or leave an owned Core (7.798428ms)
+✔ managed profiles allocate independent ports and reject a second owner of the same store (531.527495ms)
+✔ managed startup timeout terminates the actual spawned process (1065.614758ms)
+✔ actual DSH defineTool validates tools; writes require explicit configuration (2.720326ms)
+✔ credential-bearing clients reject unsafe endpoints (0.231433ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2313.641987

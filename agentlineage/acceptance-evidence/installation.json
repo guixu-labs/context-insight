@@ -1,0 +1,26 @@
+{
+  "status": "passed",
+  "core_import": true,
+  "native_query": true,
+  "offline_export": true,
+  "snapshot_id": "snap_6be60f22bf258bbe2a3311312d234e7fab15cddf486fb7a0df1e7b5ee6971803",
+  "learning_import": true,
+  "memory_restart": true,
+  "packaged_instructions": true,
+  "installed_case_memory_roundtrip": true,
+  "installed_memory_export": true,
+  "platform": "win32",
+  "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "host_imports": false,
+  "source_imports": false,
+  "artifacts": [
+    {
+      "name": "agentlineage_core-0.1.0a10-py3-none-any.whl",
+      "sha256": "dbcb4271cdb4aa407f829a69df2ecd80e4abb9912f73e6c6e5dd6933c20defb7"
+    },
+    {
+      "name": "agentlineage_learning-0.1.0a10-py3-none-any.whl",
+      "sha256": "6a46206dc11bb84372c5e1a3e2048dd3e55b1ef37682f949b834d09421df1ee3"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "contract": "context-insight.alpha3-sync-checks/v1",
+  "date": "2026-10-19",
+  "status": "passed",
+  "base_commit": "e160b799f4740382600182df2b809678a6cdb7c9",
+  "validated_source_tree": "3e4907c22f869fe3adb4a79620f470f406b5d6c8",
+  "subsequent_changes": "Acceptance summaries and test evidence only.",
+  "repository": {
+    "environment": "Ubuntu WSL, Node 24.11.1, Python 3.14.4",
+    "preparation": "Canonical Git LF archive; isolated dependency copy and test database; npm run build:export-view",
+    "command": "npm run test:all -- --maxWorkers=4",
+    "files_passed": 255,
+    "files_skipped": 1,
+    "tests_passed": 2231,
+    "tests_skipped": 8,
+    "duration_seconds": 54.11,
+    "evidence": "alpha3-sync-test-gate.txt"
+  },
+  "dsh": {
+    "environment": "Windows, Node 26.7.0, Python 3.12.10",
+    "command": "npm run check",
+    "tests_passed": 8,
+    "typescript": "passed"
+  },
+  "package": {
+    "name": "fuxi-ailabs-dsh-agentlineage-0.1.0-alpha.3.tgz",
+    "files": 14,
+    "sha256": "a556fd39eb0f775bf3318145e3ca5023e022aa1ec771631cb3711fe267fea4ad",
+    "runtime_matches_released_alpha3": true,
+    "readme": "Repository-specific paths and acceptance documentation; tgz digest differs from the original release."
+  },
+  "packaged_profile": {
+    "status": "passed",
+    "visible": [
+      "lineage_query",
+      "lineage_open",
+      "lineage_check",
+      "lineage_import",
+      "lineage_sessions",
+      "lineage_bind",
+      "lineage_status"
+    ],
+    "core_version": "0.1.0a10",
+    "current_session_auto_import": true,
+    "confirmed_writes": 1,
+    "real_file_verified": true,
+    "missing_snapshot_refused": true,
+    "model_called": false,
+    "core_port_closed_after_profile_exit": true,
+    "python_source_imports": false,
+    "default_state_scoped_to_profile": true
+  },
+  "historical_native_import": "Previously validated with alpha.2; not rerun in this alpha.3 package smoke test.",
+  "market_e2e": "dsh-market-alpha3.json",
+  "merge": "Not performed or authorized."
+}

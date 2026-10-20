@@ -1,0 +1,4 @@
+- insert:
+    - id: team.component.skills
+      name: '@team/component-skills-demo'
+      config: {}

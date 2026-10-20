@@ -1,0 +1,84 @@
+{
+  "contract": "context-insight.dsh-market-acceptance/v1",
+  "date": "2026-10-19",
+  "status": "passed",
+  "versions": {
+    "dsh": "0.2.1-rc.2",
+    "plugin": "0.1.0-alpha.3",
+    "core": "0.1.0a10"
+  },
+  "market": {
+    "title": "Fuxi DSH 插件市场",
+    "description": "Fuxi 团队插件目录",
+    "url": "https://fuxi-ailabs.github.io/dsh-plugin-market/index.json"
+  },
+  "release": {
+    "commit": "bf28b828710f1c146895bdfb63108934edbd1fe5",
+    "tag": "dsh-agentlineage-v0.1.0-alpha.3",
+    "bundle_path": "integrations/dsh",
+    "repository": "https://github.com/fuxi-ailabs/AgentLineage",
+    "visibility": "PRIVATE"
+  },
+  "method": {
+    "new_profile": true,
+    "market_ui_install": true,
+    "pinned_git_source": true,
+    "python_from_release_wheel": true,
+    "model_called": true,
+    "model": "DeepSeek-V4.1-Flash",
+    "native_calls_observed": [
+      "lineage_status",
+      "write",
+      "edit",
+      "lineage_import",
+      "lineage_query",
+      "read",
+      "lineage_status",
+      "lineage_open"
+    ],
+    "all_11_tool_results_successful": true,
+    "viewer_ui_verified": true
+  },
+  "result": {
+    "snapshot_records": 47,
+    "confirmed_writes": 2,
+    "relations": 2,
+    "changes": 2,
+    "calls": 4,
+    "expected_file_content": "Fuxi DSH market E2E\nphase=verified\n"
+  },
+  "installed_runtime_hashes": [
+    {
+      "file": "package.json",
+      "sha256": "d70a062ea648a82d1d7b198b76dbcb217b538e03c55f2d02ac72044110ca0dcb",
+      "matchesGitBlob": true
+    },
+    {
+      "file": "cordis.patch.yml",
+      "sha256": "de6e1e9f58c3bb188694b15f364563633afe5411d7a6b16a4660773cfda784a3",
+      "matchesGitBlob": true
+    },
+    {
+      "file": "dist/plugin.js",
+      "sha256": "545ca7cb38a030c933effb65debed8719393d638b5217889692eadc527fa2e80",
+      "matchesGitBlob": true
+    },
+    {
+      "file": "dist/runtime.js",
+      "sha256": "4edfcbf3f6856ef5a084607b74ebaa59a2d29b19083c13e3aaca8ec64c73ba59",
+      "matchesGitBlob": true
+    },
+    {
+      "file": "dist/sessions.js",
+      "sha256": "54aa82a13c27f129ea39d81d92be2350435cb7929665b80cc6dd469688ab3dd9",
+      "matchesGitBlob": true
+    },
+    {
+      "file": "dist/client.js",
+      "sha256": "e3bcc576639972ea35e7efb7824598c5b772c751203e9796c61d648d0dd80853",
+      "matchesGitBlob": true
+    }
+  ],
+  "scope": "One prompted end-to-end task, verified against native call/result records and Core read-back; not a general model-quality or semantic-causality benchmark.",
+  "privacy": "Only aggregate results and published artifact digests; raw sessions, credentials, screenshots and local paths are retained outside this repository."
+}

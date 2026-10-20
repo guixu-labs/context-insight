@@ -1,0 +1,8 @@
+- insert:
+    - id: team.demo.mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: component_demo
+        transport: streamable-http
+        url: http://127.0.0.1:8120/mcp
+        failOnStartupError: true

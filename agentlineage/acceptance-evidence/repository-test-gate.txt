@@ -1,0 +1,57 @@
+Full standalone repository validation; Ubuntu WSL, Node 24.11.1, Python 3.14.4.
+Trailing whitespace normalized. Test database is isolated; no sibling cpx checkout.
+
+
+> cannbot-insight@0.2.38 pretest:all
+> npm run pretest
+
+
+> cannbot-insight@0.2.38 pretest
+> tsc --noEmit && node scripts/ensure-native.mjs && node scripts/ensure-test-db.mjs
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": SQLite database "test.db" at "file:/home/administrator/.cache/context-insight-validation.hu9cuH/repo/prisma/test.db"
+
+SQLite database test.db created at file:/home/administrator/.cache/context-insight-validation.hu9cuH/repo/prisma/test.db
+
+5 migrations found in prisma/migrations
+
+Applying migration `20260612162206_init`
+Applying migration `20260613041213_add_source_path`
+Applying migration `20260616135453_unique_taskid_framework`
+Applying migration `20260617153054_add_session_meta_fields`
+Applying migration `20260916000001_proxy_framework_split`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260612162206_init/
+    └─ migration.sql
+  └─ 20260613041213_add_source_path/
+    └─ migration.sql
+  └─ 20260616135453_unique_taskid_framework/
+    └─ migration.sql
+  └─ 20260617153054_add_session_meta_fields/
+    └─ migration.sql
+  └─ 20260916000001_proxy_framework_split/
+    └─ migration.sql
+
+All migrations have been successfully applied.
+[ensure-test-db] prisma/test.db rebuilt via migrations
+[ensure-test-db] test.db journal_mode=WAL
+
+> cannbot-insight@0.2.38 test:all
+> vitest run --maxWorkers=4
+
+
+ RUN  v3.2.7 /home/administrator/.cache/context-insight-validation.hu9cuH/repo
+
+··························································/tmp/startsh-kill-it-cgQ8pD/fn.sh: line 32: slog: command not found
+/tmp/startsh-kill-it-cgQ8pD/fn.sh: line 45: slog: command not found
+·························································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································································--·········································································································································································································································································································································································································································································------···························································································································································
+
+ Test Files  255 passed | 1 skipped (256)
+      Tests  2231 passed | 8 skipped (2239)
+   Start at  18:24:35
+   Duration  54.26s (transform 3.65s, setup 6.16s, collect 20.64s, tests 150.79s, environment 5.15s, prepare 10.26s)

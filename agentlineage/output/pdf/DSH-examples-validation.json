@@ -1,0 +1,119 @@
+{
+  "markdown_links": 236,
+  "config_blocks": 29,
+  "packages": [
+    {
+      "package": "@team/component-demo",
+      "files": 6,
+      "sha256": "576b74a4076d9c7b760fc5da04ecf0acee330033665ed5498cdefacee4004059"
+    },
+    {
+      "package": "@team/component-mcp-demo",
+      "files": 5,
+      "sha256": "3bcd6958e9639c3e39dce5c8819c879f344f251346f4cbac53b697255c895fa5"
+    },
+    {
+      "package": "@team/component-skills-demo",
+      "files": 8,
+      "sha256": "eab5947541e3f9740b82e0c1be5a620e8570ff955aa61b043edb3fd2f2d29453"
+    },
+    {
+      "package": "@team/component-http-skills-demo",
+      "files": 9,
+      "sha256": "051f567e94de966cd3f46ebe0be0ebf21db68a268fede8cc852b16acb42e106a"
+    }
+  ],
+  "service_checks": [
+    "ok: expected JSON",
+    "degraded: expected JSON",
+    "invalid: expected JSON",
+    "http-error: 503",
+    "slow: client timeout",
+    "ok: auth 401/200"
+  ],
+  "errors": [],
+  "dsh_activation": "not tested: outside local example checks; no DSH activation or model invocation",
+  "commands": [
+    {
+      "command": [
+        "C:\\Program Files\\nodejs\\node.EXE",
+        "--check",
+        "D:\\work\\AgentLineage\\docs\\componentization\\examples\\http-bundle\\index.js"
+      ],
+      "cwd": "D:\\work\\AgentLineage\\docs\\componentization",
+      "exit": 0
+    },
+    {
+      "command": [
+        "C:\\Program Files\\nodejs\\npm.cmd",
+        "pack",
+        "--ignore-scripts"
+      ],
+      "cwd": "D:\\work\\AgentLineage\\docs\\componentization\\examples\\http-bundle",
+      "exit": 0
+    },
+    {
+      "command": [
+        "C:\\Program Files\\nodejs\\npm.cmd",
+        "pack",
+        "--ignore-scripts"
+      ],
+      "cwd": "D:\\work\\AgentLineage\\docs\\componentization\\examples\\mcp-bundle",
+      "exit": 0
+    },
+    {
+      "command": [
+        "C:\\Program Files\\nodejs\\node.EXE",
+        "--check",
+        "D:\\work\\AgentLineage\\docs\\componentization\\examples\\skills-bundle\\index.js"
+      ],
+      "cwd": "D:\\work\\AgentLineage\\docs\\componentization",
+      "exit": 0
+    },
+    {
+      "command": [
+        "C:\\Program Files\\nodejs\\npm.cmd",
+        "pack",
+        "--ignore-scripts"
+      ],
+      "cwd": "D:\\work\\AgentLineage\\docs\\componentization\\examples\\skills-bundle",
+      "exit": 0
+    },
+    {
+      "command": [
+        "C:\\Program Files\\nodejs\\node.EXE",
+        "--check",
+        "D:\\work\\AgentLineage\\docs\\componentization\\examples\\http-skills-bundle\\http.js"
+      ],
+      "cwd": "D:\\work\\AgentLineage\\docs\\componentization",
+      "exit": 0
+    },
+    {
+      "command": [
+        "C:\\Program Files\\nodejs\\node.EXE",
+        "--check",
+        "D:\\work\\AgentLineage\\docs\\componentization\\examples\\http-skills-bundle\\skills.js"
+      ],
+      "cwd": "D:\\work\\AgentLineage\\docs\\componentization",
+      "exit": 0
+    },
+    {
+      "command": [
+        "C:\\Program Files\\nodejs\\npm.cmd",
+        "pack",
+        "--ignore-scripts"
+      ],
+      "cwd": "D:\\work\\AgentLineage\\docs\\componentization\\examples\\http-skills-bundle",
+      "exit": 0
+    },
+    {
+      "command": [
+        "C:\\Program Files\\nodejs\\node.EXE",
+        "--check",
+        "D:\\work\\AgentLineage\\docs\\componentization\\examples\\fixtures\\health-server.mjs"
+      ],
+      "cwd": "D:\\work\\AgentLineage\\docs\\componentization",
+      "exit": 0
+    }
+  ]
+}

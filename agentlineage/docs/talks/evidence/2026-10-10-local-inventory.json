@@ -1,0 +1,35 @@
+{
+  "schema": "agentlineage-talk-inventory/1",
+  "captured_at": "2026-10-10T15:10:29.175805+08:00",
+  "scope": "Current local HarnessCore run list intersected with Core external_key; latest snapshot per matched run; development/test classification not established",
+  "core_version": "0.1.0a7",
+  "learning_version": "0.1.0a7",
+  "learning_executor_configured": false,
+  "host_runs_returned": 1,
+  "host_runs_total": 1,
+  "core_runs_returned": 2,
+  "core_runs_list_limit": 100,
+  "matched_host_runs": 1,
+  "matched_runs_with_latest_snapshot": 1,
+  "latest_snapshot_record_count_sum": 2904,
+  "unique_sources_in_latest_snapshots": 14,
+  "source_formats": {
+    "deveco": 13,
+    "host-activity": 1
+  },
+  "source_bytes_sum_deduplicated_by_source_id": 8734252,
+  "visible_native_sessions_in_latest_snapshots": 13,
+  "native_tool_calls_in_latest_snapshots": 656,
+  "repairs_returned_for_matched_runs": 0,
+  "snapshot_completeness": {
+    "partial": 1
+  },
+  "limitations": [
+    "Read-only inventory; no intervention, no counterfactual, no improvement claim",
+    "Host list may include development tasks; no production/synthetic separation inferred",
+    "Latest snapshots only; records include evidence index records and are not user-message counts",
+    "Core lists only most recent 100 runs; repair list bounded to 100 per run",
+    "Live un-frozen data and historical snapshot totals are not counted",
+    "Records and source byte totals include host-activity; formats are reported separately"
+  ]
+}

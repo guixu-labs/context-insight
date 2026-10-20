@@ -1,0 +1,15 @@
+{
+  "name": "@team/component-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Teaching example: expose an HTTP health check as a DSH tool",
+  "engines": { "node": "^22.19.0 || >=24.0.0" },
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": ["index.js", "cordis.patch.yml", "README.md", "locale"],
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
+  "peerDependencies": { "@deepseek-ai/dsh-tools": "0.2.1-alpha.2" }
+}

@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>返修链路</title>
+<style>
+  :root {
+    --page: #f3f4f7; --surface: #ffffff; --ink: #191c23; --ink-2: #4b5160; --ink-3: #8a90a0;
+    --ring: #e4e6ec; --wash: #f7f8fa; --wash-2: #eef0f4;
+    --c-src: #7c5cd6; --c-spec: #2a78d6; --c-gen: #1a9e6c; --c-file: #d68a2a; --c-fix: #cf222e; --c-dis: #0f8a7a;
+    --mono: Consolas, "Cascadia Mono", "SF Mono", Menlo, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--page); color: var(--ink); font: 14px/1.6 var(--sans);
+         padding: 22px clamp(14px, 2vw, 32px) 30px; }
+  .mono { font-family: var(--mono); }
+  header { max-width: 1720px; margin: 0 auto 12px; }
+  .crumb { font-size: 11px; color: var(--ink-3); letter-spacing: .12em; text-transform: uppercase; }
+  h1 { font-size: 22px; margin-top: 2px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 em { font-style: normal; font-size: 12.5px; color: var(--ink-3); font-weight: 400; }
+  h1 em b { color: var(--ink-2); font-family: var(--mono); font-weight: 600; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .chip { font-size: 12px; padding: 2px 11px; border: 1px solid var(--ring); border-radius: 99px; background: var(--surface); color: var(--ink-2); }
+  .chip b { color: var(--ink); }
+  .clear { display: none; font-size: 12px; color: var(--c-spec); cursor: pointer; padding: 2px 10px; border: 1px solid color-mix(in srgb, var(--c-spec) 40%, transparent); border-radius: 99px; }
+  .clear.show { display: inline-block; }
+
+  .stage-wrap { max-width: 1720px; margin: 0 auto; display: flex; gap: 12px; align-items: flex-start; }
+  .panel { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px;
+           box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 6px 18px rgba(16,24,40,.04); }
+  /* 左栏:入口 —— 任何 文件@v / agent@ver 都能当根 */
+  .rail { flex: 0 0 292px; height: calc(100vh - 176px); min-height: 460px; display: flex; flex-direction: column; overflow: hidden; }
+  .rail.closed { flex-basis: 30px; }
+  .rail.closed .railbody, .rail.closed .search { display: none; }
+  .rail .railhead { display: flex; align-items: center; gap: 6px; padding: 10px 10px 8px; border-bottom: 1px solid var(--ring); }
+  .rail .railhead b { flex: 1 1 auto; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; overflow: hidden; }
+  .rail.closed .railhead { flex-direction: column; padding: 8px 4px; }
+  .rail.closed .railhead b { writing-mode: vertical-rl; letter-spacing: .15em; }
+  .rail .tog { font-size: 12px; width: 22px; height: 22px; border: 1px solid var(--ring); background: var(--surface); border-radius: 6px; cursor: pointer; color: var(--ink-2); }
+  .rail .search { margin: 8px 10px 4px; }
+  .rail .search input { width: 100%; font: 12.5px var(--sans); padding: 6px 10px; border: 1px solid var(--ring); border-radius: 8px; background: var(--wash); color: var(--ink); outline: none; }
+  .rail .search input:focus { border-color: color-mix(in srgb, var(--c-spec) 60%, transparent); background: var(--surface); }
+  .railbody { flex: 1 1 auto; overflow-y: auto; padding: 4px 6px 12px; }
+  .rsec > .rsh { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+                 color: var(--ink-3); padding: 10px 6px 4px; cursor: pointer; user-select: none; }
+  .rsec > .rsh .n { font-weight: 500; letter-spacing: 0; }
+  .rsec > .rsh .chev { margin-left: auto; font-size: 10px; }
+  .rsec.closed > .rlist { display: none; }
+  .rkind { font-size: 10.5px; color: var(--ink-3); padding: 6px 6px 2px; cursor: pointer; user-select: none; display: flex; gap: 6px; }
+  .rkind .chev { margin-left: auto; font-size: 10px; }
+  .rkind.closed + .rklist { display: none; }
+  .ritem { border-radius: 8px; }
+  .ritem > .rrow { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px; font-size: 12px; color: var(--ink); cursor: pointer; border-radius: 8px; }
+  .ritem > .rrow:hover { background: var(--wash); }
+  .ritem.on > .rrow { background: color-mix(in srgb, var(--c-spec) 8%, var(--surface)); }
+  .ritem .lab { flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ritem .lab.mono { font-size: 11.5px; }
+  .ritem .lab .ind { color: var(--ink-3); }
+  .ritem .pill { font-size: 10px; padding: 0 6px; }
+  .ritem .vers { padding: 2px 0 6px 14px; display: none; }
+  .ritem.open .vers { display: block; }
+  .vline { display: flex; gap: 6px; align-items: baseline; padding: 3px 6px; font-size: 11.5px; color: var(--ink-2); border-radius: 6px; cursor: pointer; border-left: 2px solid var(--ring); margin-left: 2px; }
+  .vline:hover { background: var(--wash); color: var(--ink); border-left-color: var(--c-spec); }
+  .vline .vn { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); min-width: 26px; }
+  .vline .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vline.fix .t { color: var(--c-fix); }
+  .rempty { font-size: 11.5px; color: var(--ink-3); padding: 6px 8px; }
+
+  .graph { flex: 1 1 auto; min-width: 0; position: relative; overflow: auto; height: calc(100vh - 176px); min-height: 460px; }
+  .toolbar { position: sticky; top: 0; left: 0; z-index: 6; display: flex; gap: 10px; align-items: center;
+             padding: 10px 14px; background: color-mix(in srgb, var(--surface) 88%, transparent);
+             backdrop-filter: blur(6px); border-bottom: 1px solid var(--ring); font-size: 11.5px; color: var(--ink-3); }
+  .toolbar .legend { display: flex; gap: 12px; flex-wrap: wrap; flex: 1 1 auto; }
+  .legend i { font-style: normal; display: inline-flex; align-items: center; gap: 4px; }
+  .legend .sw { width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid; display: inline-block; }
+  .zoomctl { display: flex; gap: 4px; }
+  .zoomctl button { font-size: 12px; min-width: 26px; height: 24px; border: 1px solid var(--ring); padding: 0 8px;
+                    background: var(--surface); border-radius: 6px; cursor: pointer; color: var(--ink-2); }
+  .zoomctl button:hover { background: var(--wash); }
+  .canvas { position: relative; transform-origin: 0 0; }
+  .colhead { position: absolute; top: 0; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+             color: var(--ink-3); padding-bottom: 5px; border-bottom: 2px solid var(--ring); text-align: center; white-space: nowrap; overflow: hidden; }
+  .colhead.root { color: var(--c-file); border-color: var(--c-file); }
+  .colhead.rootA { color: var(--c-gen); border-color: var(--c-gen); }
+  .colhead.fix { color: var(--c-fix); border-color: var(--c-fix); }
+  .colhead.down { color: var(--c-spec); border-color: var(--c-spec); }
+  svg.wires { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 1; overflow: visible; }
+  .wire { fill: none; stroke: #cfd3dc; stroke-width: 1.4; transition: stroke .12s, stroke-width .12s; }
+  .wire.on { stroke: var(--c-file); stroke-width: 2.2; }
+  .node { position: absolute; z-index: 2; height: 30px; font-size: 12px; padding: 0 26px 0 10px; line-height: 28px;
+          border: 1.4px solid var(--ring); border-radius: 8px; background: var(--wash); cursor: pointer;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2);
+          transition: box-shadow .12s, transform .12s; }
+  .node:hover { box-shadow: 0 2px 10px rgba(16,24,40,.14); transform: translateY(-1px); z-index: 3; }
+  .node.sel { box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--c-spec) 45%, transparent); }
+  .node .chev { position: absolute; right: 8px; top: 0; color: var(--ink-3); font-size: 10px; }
+  .node .badge { display: inline-block; font-size: 9.5px; line-height: 14px; padding: 0 5px; margin-left: 5px; border-radius: 4px;
+                 background: var(--wash-2); color: var(--ink-3); vertical-align: 1px; font-family: var(--sans); }
+  .node .badge.stale { background: color-mix(in srgb, var(--c-fix) 12%, transparent); color: var(--c-fix); font-weight: 700; }
+  .node .badge.via { background: color-mix(in srgb, var(--c-src) 12%, transparent); color: var(--c-src); }
+  .node .badge.self { background: color-mix(in srgb, var(--c-gen) 12%, transparent); color: var(--c-gen); }
+  .node.file { border-color: color-mix(in srgb, var(--c-file) 55%, transparent); font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
+  .node.file.root { background: color-mix(in srgb, var(--c-file) 10%, var(--surface)); border-width: 2px; font-weight: 600; }
+  .node.file.stale { border-left: 4px solid var(--c-fix); }
+  .node.gen  { border-color: color-mix(in srgb, var(--c-gen) 55%, transparent); color: var(--ink); background: color-mix(in srgb, var(--c-gen) 5%, var(--surface)); }
+  .node.gen.root { border-width: 2px; font-weight: 600; background: color-mix(in srgb, var(--c-gen) 12%, var(--surface)); }
+  .node.gen.sharp { border-color: var(--c-fix); box-shadow: inset 3px 0 0 var(--c-fix); }
+  .node.fix  { border-color: var(--c-fix); color: var(--c-fix); font-weight: 600; background: color-mix(in srgb, var(--c-fix) 5%, var(--surface)); }
+  .node.dispatch { border-style: dashed; border-color: var(--c-dis); color: var(--c-dis); background: var(--surface); }
+  .node.leaf { border-color: color-mix(in srgb, var(--c-src) 45%, transparent); color: var(--c-src); cursor: default; }
+  .node.leaf:hover { transform: none; box-shadow: none; }
+  .node.down { border-style: dotted; }
+  .cvempty { position: absolute; left: 24px; top: 40px; font-size: 12.5px; color: var(--ink-3); line-height: 1.8; max-width: 520px; }
+
+  .side { flex: 0 0 380px; position: relative; padding: 0; max-height: calc(100vh - 176px); min-height: 460px; overflow-y: auto; }
+  .side .placeholder { color: var(--ink-3); font-size: 12.5px; line-height: 1.8; padding: 22px 20px; }
+  .side .head { padding: 16px 20px 12px; border-bottom: 1px solid var(--ring); position: sticky; top: 0; background: var(--surface); z-index: 2; border-radius: 14px 14px 0 0; }
+  .side .head.file { border-top: 4px solid var(--c-file); }
+  .side .head.gen { border-top: 4px solid var(--c-gen); }
+  .side .head.fix { border-top: 4px solid var(--c-fix); }
+  .side .tag { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+  .side .head.file .tag { color: var(--c-file); } .side .head.gen .tag { color: var(--c-gen); } .side .head.fix .tag { color: var(--c-fix); }
+  .side h3 { font-size: 15px; word-break: break-all; margin-top: 2px; line-height: 1.35; }
+  .side .sub { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; word-break: break-all; }
+  .side .rootbtn { margin-top: 8px; font: 12px var(--sans); padding: 4px 12px; border-radius: 99px; cursor: pointer;
+                   border: 1px solid color-mix(in srgb, var(--c-spec) 50%, transparent); color: var(--c-spec); background: var(--surface); }
+  .side .rootbtn:hover { background: color-mix(in srgb, var(--c-spec) 8%, var(--surface)); }
+  .side .body { padding: 6px 20px 20px; }
+  .side .sec { margin-top: 16px; }
+  .side .sec > b { display: block; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); font-weight: 700; margin-bottom: 6px; }
+  .side .kv { font-size: 12.5px; color: var(--ink-2); line-height: 1.7; }
+  .side .kv .k { color: var(--ink-3); font-size: 11px; margin-right: 6px; }
+  .side .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--wash-2); color: var(--ink-2); }
+  .pill.warn { background: color-mix(in srgb, var(--c-fix) 10%, transparent); color: var(--c-fix); font-weight: 600; }
+  .pill.ok { background: color-mix(in srgb, var(--c-gen) 10%, transparent); color: var(--c-gen); }
+  .pill.via { background: color-mix(in srgb, var(--c-src) 10%, transparent); color: var(--c-src); }
+  .vrow { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 8px;
+          font-size: 12px; color: var(--ink-2); border-left: 3px solid transparent; }
+  .vrow:hover { background: var(--wash); }
+  .vrow.anchor { background: color-mix(in srgb, var(--c-file) 10%, transparent); border-left-color: var(--c-file); }
+  .vrow.dim { opacity: .5; }
+  .vrow .vn { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .vrow .who { font-weight: 600; color: var(--ink); }
+  .vrow .who.fix { color: var(--c-fix); } .vrow .who.ext { color: var(--c-src); font-weight: 500; }
+  .vrow .meta { font-size: 11px; color: var(--ink-3); display: block; }
+  .vrow .act { font-size: 11px; color: var(--c-spec); cursor: pointer; white-space: nowrap; }
+  .vrow .act:hover { text-decoration: underline; }
+  .diffblock, .srcblock { grid-column: 1 / -1; font: 11px/1.55 var(--mono); background: var(--wash);
+               border: 1px solid var(--ring); border-radius: 7px; padding: 8px 10px; margin: 4px 0 6px;
+               white-space: pre-wrap; word-break: break-all; overflow-x: auto; }
+  .srcblock { white-space: pre; overflow: auto; max-height: 60vh; counter-reset: ln; }
+  .srcblock .ln { display: block; }
+  .srcblock .ln::before { counter-increment: ln; content: counter(ln); display: inline-block; width: 3.2em; color: var(--ink-3); text-align: right; margin-right: 12px; user-select: none; }
+  .dl-add { color: #1a7f37; background: rgba(26,158,108,.10); display: inline; }
+  .dl-del { color: #cf222e; background: rgba(207,34,46,.08); display: inline; }
+  .dl-ctx { color: var(--ink-3); }
+  .quote { font-size: 12px; color: var(--ink-2); background: var(--wash); border-radius: 10px; padding: 10px 12px;
+           border-left: 3px solid var(--ring); line-height: 1.65; word-break: break-word; margin-top: 8px; white-space: pre-wrap; }
+  .quote b { display: block; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; white-space: normal; color: var(--ink-3); }
+  .quote.dispatch { border-left-color: var(--c-gen); } .quote.dispatch b { color: var(--c-gen); }
+  .quote.cause { border-left-color: var(--c-fix); } .quote.cause b { color: var(--c-fix); }
+  .quote.inbox { border-left-color: var(--c-spec); } .quote.inbox b { color: var(--c-spec); }
+  .quote.dim { opacity: .6; }
+  .more { font-size: 11px; color: var(--c-spec); cursor: pointer; white-space: nowrap; }
+  .tl { position: relative; margin-top: 4px; }
+  .tl .trow { display: grid; grid-template-columns: 40px 1fr; gap: 8px; padding: 5px 8px; border-radius: 8px; font-size: 12px; color: var(--ink-2); border-left: 3px solid transparent; }
+  .tl .trow:hover { background: var(--wash); }
+  .tl .trow.anchor { background: color-mix(in srgb, var(--c-gen) 10%, transparent); border-left-color: var(--c-gen); }
+  .tl .trow.dim { opacity: .5; }
+  .tl .vn { font-family: var(--mono); font-size: 11px; color: var(--ink-3); padding-top: 1px; }
+  .tl .eff { color: var(--ink); }
+  .tl .inp { font-size: 11px; color: var(--ink-3); }
+  .arow { font-size: 11px; color: var(--ink-3); padding: 2px 0 2px 8px; border-left: 2px solid var(--ring); margin: 2px 0 0 4px; word-break: break-all; }
+  .arow .vn { font-family: var(--mono); color: var(--ink-3); }
+  .arow .diffblock { margin-top: 4px; }
+  .lnk { color: var(--c-spec); cursor: pointer; }
+  .lnk:hover { text-decoration: underline; }
+  .lnk.mono { font-family: var(--mono); font-size: 11.5px; }
+
+  .empty { max-width: 620px; margin: 12vh auto 0; text-align: center; color: var(--ink-3); }
+  .empty h2 { color: var(--ink-2); font-size: 17px; margin-bottom: 8px; }
+</style>
+</head><body>
+
+<header>
+  <div class="crumb">MigLoop · Fix Traceback</div>
+  <h1>返修链路<em id="rootlbl">两原子探索树 —— 文件 × agent，任何一个时刻都能当根</em>
+    <span class="clear" id="clear">✕ 回到入口</span></h1>
+  <div class="chips" id="chips"></div>
+</header>
+<div class="stage-wrap" id="wrap" hidden>
+  <aside class="rail panel" id="rail">
+    <div class="railhead"><b>入口 · 选一个时刻当根</b><button class="tog" id="railtog" title="收起/展开">◂</button></div>
+    <div class="search"><input id="q" type="search" placeholder="搜文件名 / 路径 / agent / 会话…" autocomplete="off"></div>
+    <div class="railbody" id="railbody"><div class="rempty">账本装配中…</div></div>
+  </aside>
+  <div class="graph panel" id="graph">
+    <div class="toolbar">
+      <div class="legend">
+        <i><span class="sw" style="border-color:var(--c-file)"></span>文件@时间</i>
+        <i><span class="sw" style="border-color:var(--c-gen)"></span>agent@时间</i>
+        <i><span class="sw" style="border-color:var(--c-dis);"></span>派发它的上游</i>
+        <i><span class="sw" style="border-color:var(--c-spec);"></span>下游(读者 / 产出)</i>
+        <i><span class="sw" style="border-color:var(--c-fix)"></span>修复方</i>
+        <i>红色：模型判断</i><i>虚线：模型复核补充</i>
+      </div>
+      <div class="zoomctl"><button id="summary" hidden>总结与建议</button><button id="freeze" aria-pressed="false" disabled title="冻结当前树，点击节点只查看详情。">冻结展开</button><button id="zo">−</button><button id="zi">+</button><button id="zf">适应</button><button id="z1">1:1</button></div>
+    </div>
+    <div class="canvas" id="canvas"><svg class="wires" id="wires"></svg></div>
+  </div>
+  <aside class="side panel" id="side">
+    <div class="placeholder">左栏搜一个文件或 agent,点开它的时间,选一个当根。<br><br>文件@时间 → 左边写者(上游),右边读者(下游);<br>agent@时间 → 左边读取与派发者(上游),右边产出(下游)。<br><br>右侧抽屉:写入脊柱 / 原文观察 / 派发指令 / 收件箱 / 时间线。</div>
+  </aside>
+</div>
+<div class="empty" id="empty" hidden>
+  <h2>本次会话没有返修记录</h2>
+  <div>修复轮(verify/fixer)发生后,这里会为每一次修复画出完整链路。</div>
+</div>
+
+<style>
+/* Only the time/review overlay and its load dialog supplement the prototype. */
+/* Match history controls' hit areas to their visible height; preserve the base theme. */
+.vrow .act{display:inline-flex;align-items:stretch;cursor:auto}
+.vrow .act:hover{text-decoration:none}
+.vrow .act>.lnk{display:block;padding:2px 3px}
+.node.dispatch,.node.down{border-style:solid}.node.reviewed{border-style:dashed}
+.wire.reviewed{stroke-dasharray:4 4}.node.problem{border-color:var(--c-fix);color:var(--c-fix)}
+.zoomctl button{white-space:nowrap}.zoomctl button[aria-pressed="true"]{color:var(--c-spec);border-color:var(--c-spec);background:color-mix(in srgb,var(--c-spec) 7%,var(--surface))}
+.zoomctl button:disabled{opacity:.5;cursor:default}.tree-frozen .node .chev{visibility:hidden}
+#freeze{min-width:72px}
+/* The name/coordinate split is retained from dev/fixchain, with time as suffix. */
+.node-caption { display: inline-flex; max-width: 100%; vertical-align: top; }
+.node-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.node-version { flex: 0 0 auto; }
+dialog{margin:auto;width:min(620px,90vw);max-height:80vh;overflow:auto;padding:20px;color:var(--ink);border:1px solid var(--ring);border-radius:14px}
+dialog::backdrop{background:#16202d55}dialog h3{font-size:16px;margin-bottom:12px}dialog .close{float:right}
+.attribution-row{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:10px;font-size:12px}
+.attribution-row:hover{background:var(--wash)}.attribution-row .lab{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.attribution-load{flex:none;font:11px var(--sans);color:var(--c-spec);background:var(--paper,#fff);border:1px solid var(--ring);border-radius:7px;padding:4px 9px;cursor:pointer}
+.attribution-load:hover{background:var(--wash)}.attribution-load:disabled{opacity:.55;cursor:wait}.attribution-details{display:inline-block;margin:6px 8px}
+dialog input,dialog select{font:12px var(--sans);padding:6px;max-width:100%;border:1px solid var(--ring);border-radius:6px}
+dialog p,dialog details{margin-top:12px}dialog summary{cursor:pointer;font-size:12px}
+.error{color:var(--c-fix);white-space:pre-wrap}.sec.folded> :not(b){display:none}.sec.folded>b,.sec.foldable>b{cursor:pointer}
+</style>
+<dialog id="reportsDialog"><span class="more close" id="closeReports">关闭</span><h3>归因详情</h3>
+<div id="reportNotes"></div><p><select id="finding" aria-label="选择问题"><option value="">全部问题</option></select></p>
+<details><summary>导入 YAML / JSON 结果文件</summary><input type="file" id="importReport" accept=".yaml,.yml,.json"></details><p class="error" id="reportError"></p></dialog>
+<dialog id="timeDialog"><span class="more close" id="closeTime">关闭</span><h3>查看这个时刻</h3><p id="timeName"></p>
+<input id="at" aria-label="截止时间" style="width:100%"><p><span class="lnk" id="applyTime">以此时间为根 →</span></p></dialog>
+<script>window.INQUIRY_CONFIG = __INQUIRY_CONFIG__;</script>
+<script src="__INQUIRY_ASSET_BASE__/tree.js"></script>
+<script src="__INQUIRY_ASSET_BASE__/viewer.js"></script>
+</body></html>

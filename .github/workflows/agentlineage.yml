@@ -1,0 +1,77 @@
+name: validate-agentlineage
+on:
+  push:
+    paths: ['agentlineage/**', 'src/**', 'tests/**', 'scripts/**', 'package.json', 'tsconfig.json', 'vitest.config.ts', '.github/workflows/agentlineage.yml']
+  pull_request:
+    paths: ['agentlineage/**', 'src/**', 'tests/**', 'scripts/**', 'package.json', 'tsconfig.json', 'vitest.config.ts', '.github/workflows/agentlineage.yml']
+permissions:
+  contents: read
+jobs:
+  insight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-audit --no-fund
+      - run: python -m pip install ./agentlineage/components/core
+      - run: npm run test:all -- --maxWorkers=4
+        env:
+          AGENTLINEAGE_TEST_PYTHON: python
+  components:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: agentlineage
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: agentlineage/integrations/dsh/package-lock.json
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pip install -e './components/core[mcp]' -e ./components/learning
+      - run: python -m ruff check components tests scripts
+      - run: python -m mypy
+      - run: python -m pytest tests -q
+      - run: python -m build --no-isolation components/core
+      - run: python -m build --no-isolation components/learning
+      - run: python scripts/verify_install.py
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: agentlineage/integrations/dsh
+      - run: npm run check
+        working-directory: agentlineage/integrations/dsh
+        env:
+          AGENTLINEAGE_TEST_PYTHON: python
+      - run: npm pack --ignore-scripts
+        working-directory: agentlineage/integrations/dsh
+      - run: npm install --no-audit --no-fund
+        working-directory: .
+      - run: node --input-type=module -e "import Database from 'better-sqlite3';const db=new Database('prisma/test.db');db.close()"
+        working-directory: .
+      - run: npx prisma migrate deploy
+        working-directory: .
+        env:
+          DATABASE_URL: file:./test.db
+      - run: npx vitest run tests/ut/lineage-api.test.ts
+        working-directory: .
+        env:
+          AGENTLINEAGE_TEST_PYTHON: python
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agentlineage-${{ matrix.os }}
+          path: |
+            agentlineage/components/*/dist/*
+            agentlineage/integrations/dsh/*.tgz
+            agentlineage/artifacts/installation-check.json

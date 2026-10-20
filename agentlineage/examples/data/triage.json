@@ -1,0 +1,25 @@
+{
+  "scope": {
+    "project_roots": [
+      "/demo"
+    ],
+    "generation_end": "2026-01-01T00:00:05Z",
+    "observation_end": "2026-01-01T00:00:09Z"
+  },
+  "issues": [
+    {
+      "title": "Spacing changed from 8 to 4",
+      "changes": [
+        {
+          "files": [
+            "/demo/view.py"
+          ],
+          "change": "spacing=8 became spacing=4",
+          "evidence": [
+            "001-repair.jsonl:L1-L2"
+          ]
+        }
+      ]
+    }
+  ]
+}

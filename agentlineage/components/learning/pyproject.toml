@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentlineage-learning"
+version = "0.1.0a10"
+readme = "README.md"
+description = "Evidence-bound investigation cases and versioned agent experience"
+requires-python = ">=3.12"
+dependencies = ["agentlineage-core==0.1.0a10", "PyYAML>=6,<7"]
+
+[project.scripts]
+agentlineage-learning = "agentlineage_learning.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"agentlineage_learning" = ["py.typed", "instructions/**/*.md", "instructions/**/*.py"]

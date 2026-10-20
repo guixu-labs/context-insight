@@ -1,0 +1,574 @@
+{
+  "schema": "agentlineage-provenance/1",
+  "files": [
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/__init__.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/__init__.py",
+      "sha256": "e3b0f9a22c53e5f4ba272b1896d8894bef74f4773faa6a5e366eb03b64c1b758",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "e3b0f9a22c53e5f4ba272b1896d8894bef74f4773faa6a5e366eb03b64c1b758"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/card.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/card.py",
+      "sha256": "809cd48005f8152ede0ac2a913ea37626e7b660cabb95599513c65a94fed75c9",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "496e6925b6e959a9c303dcf6477ac58da1db45bae18009ca484eb2d476499303"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/check_receipts.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/check_receipts.py",
+      "sha256": "e2a44deff2d2719e054f7448485cf953dfead578996329ceec18aa984235f140",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "e2a44deff2d2719e054f7448485cf953dfead578996329ceec18aa984235f140"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/citations.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/citations.py",
+      "sha256": "ad6c0cc9a466a45e0f0bc130547031f8890141355f89facd8ddc7a545eda377f",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "c881f277ec918e660fce7feb821d92c7366ae82539b20f2e73fa4707faedf621"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/command_shape.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/command_shape.py",
+      "sha256": "0ee5d519e611d67a4075893d066b61735455e9228cf22ec57f37f3a853c8e4d5",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "63f6dc1bfb42ddd66a9507b10bd29e03fa2cbb578cf2bf0b27b8eefe1c7abc04"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/coverage.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/coverage.py",
+      "sha256": "c007c3daa303e77aa4059b213270d5752102d354d448427b06742c5a2af7ba3e",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "c007c3daa303e77aa4059b213270d5752102d354d448427b06742c5a2af7ba3e"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/delivery.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/delivery.py",
+      "sha256": "064c7e1bdea58a4e2530ae1b3b5694cf87089405687b4a35066f7dfdb822d102",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "064c7e1bdea58a4e2530ae1b3b5694cf87089405687b4a35066f7dfdb822d102"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/edge_submission.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/edge_submission.py",
+      "sha256": "d60c9e59875887eac5d3bc760655d9b643b90d56e023fe34c8fbb9b1d52762b7",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "d60c9e59875887eac5d3bc760655d9b643b90d56e023fe34c8fbb9b1d52762b7"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/engine.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/engine.py",
+      "sha256": "f2f994ae6ccd87b07d3bee535ed3ef846225da50aa04539b89834e228fdae905",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "8e8bc98f0b72c48e010ea7b08448e807efed4077c3a646bbc21c2e48889af301"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/evidence_graph.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/evidence_graph.py",
+      "sha256": "e6d13bd9724148acb78722998c97c9f5245ff70f93546a1f9af1869f0e9b98e5",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "e6d13bd9724148acb78722998c97c9f5245ff70f93546a1f9af1869f0e9b98e5"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/evidence_review.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/evidence_review.py",
+      "sha256": "c9b826ab8ec212dc03eed124be74fd24e1b7e2e34cb5866eacdc96a16fe5b3c3",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "9232b10a63c6142f0291e65f232c06e744d06a02e7f7f6b2f2a89a00eda6c194"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/feedback.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/feedback.py",
+      "sha256": "27fc4f3205795b9ee2b353fd5b2e0c754e0369a60f75c6b45828292b5256496a",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "6dd47be9c85b923492548ff7b002616ad67081237e397980a2b15c68651d8b17"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/interfaces.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/interfaces.py",
+      "sha256": "c386b174ea9914feb4f21578ab4b781a0d60d372862e1603e459afc2429acfc1",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "009e597fb1e13715e36b26cd7ac3a6d20d4470d2207dffbc0b7128ddf4ca64b8"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/narrative.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/narrative.py",
+      "sha256": "2ee1490dbb8625b94dbeb5e7e1fcf346a1e8b2bcd98b6320cc3cdbc972e17838",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "565cc69410997637dba24c1afcad5c653935805055ab8022d004394e029e5d1e"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/native_text.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/native_text.py",
+      "sha256": "bf903d0b51669fba3ed309a8e5abfe86ba66be3f13505f3368eb0c0b08703ced",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "eb506e4bcd1e6896759a0b7b55ca15f3e769480048468d7dafeb9bcf78ae10ad"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/page.html",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/page.html",
+      "sha256": "b610308bde087763133b16729478f9cfef84d71d34450b72a3723de6531555d6",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "b610308bde087763133b16729478f9cfef84d71d34450b72a3723de6531555d6"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/report.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/report.py",
+      "sha256": "719d736d15027afb7cb6d354eaa77bc079d6e9b7d1bc8f58737860d50f76d72e",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "15e5a1819a86a785d2cdaa684fa83cc7fba68323dd3689168790673bc21e1d8f"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/request_context.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/request_context.py",
+      "sha256": "c3fa12ef019e04e9acba0a747677b5bd6e0474398ff316705153b35232cdddf1",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "c3fa12ef019e04e9acba0a747677b5bd6e0474398ff316705153b35232cdddf1"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/search_groups.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/search_groups.py",
+      "sha256": "ee5312d74a6f6356998c5dfd61f7ab79c7f033587c4c884bc045ac814c55d8fc",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "ee5312d74a6f6356998c5dfd61f7ab79c7f033587c4c884bc045ac814c55d8fc"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/source_adapters/__init__.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/source_adapters/__init__.py",
+      "sha256": "2d6b77737160e26bc9b32acbf8adad9375d13ed9055d2028f7adca660eefa857",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "2d6b77737160e26bc9b32acbf8adad9375d13ed9055d2028f7adca660eefa857"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/source_adapters/__main__.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/source_adapters/__main__.py",
+      "sha256": "69e60f30e36a5885f71ef706bdd0199a8ea15faf470ac3a8366c02dc6cb03af9",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "69e60f30e36a5885f71ef706bdd0199a8ea15faf470ac3a8366c02dc6cb03af9"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/source_adapters/base.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/source_adapters/base.py",
+      "sha256": "dd9fecc2ecf2b728b6d373d3eb8778d688b7ba615244d6e607ff649c8e5b7bc1",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "dd9fecc2ecf2b728b6d373d3eb8778d688b7ba615244d6e607ff649c8e5b7bc1"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/source_adapters/claude.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/source_adapters/claude.py",
+      "sha256": "367570f24a14001cf8f8d0181f84f57995455d5ae0cd60b56c7ec6d1555fb2b8",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "367570f24a14001cf8f8d0181f84f57995455d5ae0cd60b56c7ec6d1555fb2b8"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/source_adapters/codex.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/source_adapters/codex.py",
+      "sha256": "621c15cde7358456661d5e4a37b67a79a61166239c98cc4e31453bff04a0e1b7",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "1b0463a608d67502b6e11594feb81110af1a0d149f0882d6e316b2830c259c30"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/source_adapters/codex_commands.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/source_adapters/codex_commands.py",
+      "sha256": "dbc6badc4e00379392a8e7e3196547990c5cc6912cb7df0b575e9a5bd2c3d7ec",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "2cfb8646c5389970ceea5e76287411f4d8482623847432517c9c073b8dfc637a"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/source_adapters/deveco.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/source_adapters/deveco.py",
+      "sha256": "ccf544a8f7c63d0f3e8f6fb99809d6b51f9c56c0d86eaddb41912b822e37700f",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "ccf544a8f7c63d0f3e8f6fb99809d6b51f9c56c0d86eaddb41912b822e37700f"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/source_adapters/export.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/source_adapters/export.py",
+      "sha256": "7dae0cb9d8550deede495440538f88eaa192d3767a1cc3f78bbcd204bca6e9c2",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "004760c513d1b2d616c10ce5b85203fd3beec8507304d49604572f4163d43272"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/store.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/store.py",
+      "sha256": "7215d5b041dc7388698794676244ca08eab67997c130307774486c974e0e7a12",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "5fa71795bcc29eea43096072591842461b772879f0de8faf8f284a04ac4aa832"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/tool_contracts.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/tool_contracts.py",
+      "sha256": "0acd20d73464edf70c294e324aeecbaa6fcaed61e95d9dd52b9b6663bb59ead8",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "56b55b099b6b5306f64f89a0ec20b16f4848c548cd0d05ec3e44fcc73a01ea06"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/tree.js",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/tree.js",
+      "sha256": "bdf0aa3bd8a02eff1a8e326a7cda09354ca3475f7df7e89317cf5511f1f363e3",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "bdf0aa3bd8a02eff1a8e326a7cda09354ca3475f7df7e89317cf5511f1f363e3"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/tree.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/tree.py",
+      "sha256": "c6530efe89269aaa6a052200bb1df1b577c6974d0f55cc5870bbdc80291651ac",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "4e058024254365d0bb1bbb61b8f958e95beb27faafc0b39248270d86556894fa"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/viewer.js",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/viewer.js",
+      "sha256": "4d1c2d6087cd678ae702f433faa67f30e61946bc5d5c42a5ec27f512b4d98029",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "4d1c2d6087cd678ae702f433faa67f30e61946bc5d5c42a5ec27f512b4d98029"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/viewer.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/viewer.py",
+      "sha256": "5f92f7f312263656ea76d6b96cdef61aca1bedfe88f2407170209f98ebf76d34",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "47dc0ae72f588e65be47416e415cad17387a73825ced743e8e50f5b41ee0295a"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/inquiry/web.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/migloop/inquiry/web.py",
+      "sha256": "00289d44027e90e17e66fd7833b04b2f70cd4c0ef1631817a27a31da78ee622c",
+      "change": "namespace relocation; explicit container typing; AgentLineage MCP identity and tool annotations",
+      "current_sha256": "00289d44027e90e17e66fd7833b04b2f70cd4c0ef1631817a27a31da78ee622c"
+    },
+    {
+      "target": "components/core/src/agentlineage_core/lineage.py",
+      "repository": "fuxi-ailabs/hmigbot-plus",
+      "commit": "f86742295c5b287d00e9cd8423164611eecccc72",
+      "source": "src/migbot/insight/blame.py",
+      "sha256": "01e15cef8d6186a109223029d85c29304f3f950f969384750bdb8772f8e7e2ee",
+      "change": "standalone line ownership replay extracted without host imports",
+      "checkout_sha256": "52f7cfa0f824aaafce005bc2110aef6e45b0d0271162ebe289732028eb03e9d5",
+      "current_sha256": "01e15cef8d6186a109223029d85c29304f3f950f969384750bdb8772f8e7e2ee"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/extensions/hmigbot_environment.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/memorylib/environment.py",
+      "sha256": "57176bd1216fe17c8fb6776c4b46a57c13949e436d0ccbf5fa68e5aa7d9d7abc",
+      "change": "optional HMigBot environment parser; relocated imports; not enabled by default",
+      "current_sha256": "d58d33be5fba21b8cf40b4a3f97f1f310f22083897326dc310511aabbe9427f3"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/instructions/migloop-build-cards/SKILL.md",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/skills/migloop-build-cards/SKILL.md",
+      "sha256": "cbbb0c32f4e42dd61a571556da5b741e93bc456b2dac9305521445f520a19b16",
+      "change": "versioned instruction asset; installed-package script imports and Python/version guidance",
+      "current_sha256": "dbe0f74034c53ace3a13ec33e13bf3e4f34fc389af564fc013cb39ae4f8fbf79"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/instructions/migloop-build-cards/references/card.md",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/skills/migloop-build-cards/references/card.md",
+      "sha256": "da5496f54783ac3343081a4870c698275bcd42ef3c460e26025a63ce30522c3e",
+      "change": "versioned instruction asset; installed-package script imports and Python/version guidance",
+      "current_sha256": "da5496f54783ac3343081a4870c698275bcd42ef3c460e26025a63ce30522c3e"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/instructions/migloop-build-cards/references/environment.md",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/skills/migloop-build-cards/references/environment.md",
+      "sha256": "a52f7295e8198ef042ea52f953a2adb28c382f6f3346e6b9ce62db943f766569",
+      "change": "versioned instruction asset; installed-package script imports and Python/version guidance",
+      "current_sha256": "a52f7295e8198ef042ea52f953a2adb28c382f6f3346e6b9ce62db943f766569"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/instructions/migloop-build-cards/scripts/cases.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/skills/migloop-build-cards/scripts/cases.py",
+      "sha256": "26a3cc0b6d894d5e61a21abdd990d6974bc7e05d4cb31ef4b4372568b56a151d",
+      "change": "versioned instruction asset; installed-package script imports and Python/version guidance",
+      "current_sha256": "34a73d45396bf45c8bf6019f52eb93950f12cf30f42fbd7423f8948797ffc853"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/instructions/migloop-memory-maintain/SKILL.md",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/skills/migloop-memory-maintain/SKILL.md",
+      "sha256": "c37da192dec34206075a4b7e145a6499db62ac7435f76e0962d4f351d846d583",
+      "change": "versioned instruction asset; installed-package script imports and Python/version guidance",
+      "current_sha256": "25629f16b2e571bca5819f61f8f89afdb692c3dc4b9396bbae2a499da01b2e30"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/instructions/migloop-memory-maintain/scripts/memory.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/skills/migloop-memory-maintain/scripts/memory.py",
+      "sha256": "b129d09096b581a41a8bba3eccfc2b731be3d9e21947a44bfebf4f2e5b23a6b6",
+      "change": "versioned instruction asset; installed-package script imports and Python/version guidance",
+      "current_sha256": "f319fb10ac6ee7edd9914e23412387840682580f75368c60a7fa4892d1f2ff1c"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/instructions/migloop-memory-recall/SKILL.md",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/skills/migloop-memory-recall/SKILL.md",
+      "sha256": "2c7c7a726e68ac15e3333a14467bb394e3527912cfd6f8502559e7c252a5bbeb",
+      "change": "versioned instruction asset; installed-package script imports and Python/version guidance",
+      "current_sha256": "2c7c7a726e68ac15e3333a14467bb394e3527912cfd6f8502559e7c252a5bbeb"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/instructions/migloop-memory-recall/references/claude-hook.md",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/skills/migloop-memory-recall/references/claude-hook.md",
+      "sha256": "ee88db2bb5bd7e38940a9b152e1fe8337f4615b25b8de6ca6c8923df7d8da4fe",
+      "change": "versioned instruction asset; installed-package script imports and Python/version guidance",
+      "current_sha256": "ee88db2bb5bd7e38940a9b152e1fe8337f4615b25b8de6ca6c8923df7d8da4fe"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/instructions/migloop-memory-recall/references/usage.md",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/skills/migloop-memory-recall/references/usage.md",
+      "sha256": "1108f3cc47b22ffa7093748f7fb8688d702d0e739fc454b73b94c09907e79ab8",
+      "change": "versioned instruction asset; installed-package script imports and Python/version guidance",
+      "current_sha256": "1108f3cc47b22ffa7093748f7fb8688d702d0e739fc454b73b94c09907e79ab8"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/instructions/migloop-memory-recall/scripts/claude_hook.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/skills/migloop-memory-recall/scripts/claude_hook.py",
+      "sha256": "35cc168c13dec7b349d22388c64a7067c13bbbc8d8cfb38593b987b95317dc07",
+      "change": "versioned instruction asset; installed-package script imports and Python/version guidance",
+      "current_sha256": "dcc62dd18d2340b8ca40123f09a134d02bbab65afd87db244a68ee5035a45f46"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/instructions/migloop-memory-recall/scripts/recall.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/skills/migloop-memory-recall/scripts/recall.py",
+      "sha256": "dca004986da62ea8321e5702f3c5b455970106082c9f9a2bf68a532cbaa68368",
+      "change": "versioned instruction asset; installed-package script imports and Python/version guidance",
+      "current_sha256": "432420f092d302909c73f0b9091b30a03e83984582074cf85fb8b11df40cc944"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/instructions/migloop-repair-triage/SKILL.md",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/skills/migloop-repair-triage/SKILL.md",
+      "sha256": "56afe42092ce42fa8a7ca3ec8636a165cbf205e4614e0b99cad73fd3038c9b06",
+      "change": "versioned instruction asset; installed-package script imports and Python/version guidance",
+      "current_sha256": "7e72e8e0583c89836e1d5bab1ad5f1202bb5d5cca17b3b7b823a56a31c88fe81"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/instructions/migloop-repair-triage/scripts/triage.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/skills/migloop-repair-triage/scripts/triage.py",
+      "sha256": "334280a3671d8978d3ded8e4808230410541ce27d33c8d7e436d6f67a023e314",
+      "change": "versioned instruction asset; installed-package script imports and Python/version guidance",
+      "current_sha256": "6e070a4310516178a13d9ce80aa854953277bcd869c71feb562ec203c30fd1ba"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/instructions/migloop-session-to-memory/SKILL.md",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/skills/migloop-session-to-memory/SKILL.md",
+      "sha256": "c96aeff30931273ebad4031750d914463499ad69ffadbf6ea37a44405b7a229a",
+      "change": "versioned instruction asset; installed-package script imports and Python/version guidance",
+      "current_sha256": "c6898ff1a0140bafc9ccab475bef9b629cfbf16813c4c9672ce6acd50b9f01f1"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/memory/__init__.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/memorylib/__init__.py",
+      "sha256": "27dd181a4b63f9caf6e409ec5fb08da2f705d0a10272a0100328d36d4a642f36",
+      "change": "namespace relocation; public Core SDK binding; Windows path normalization; explicit container typing",
+      "current_sha256": "27dd181a4b63f9caf6e409ec5fb08da2f705d0a10272a0100328d36d4a642f36"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/memory/card_contract.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/memorylib/card_contract.py",
+      "sha256": "a10018b408070a544c3cb4739947f4426a684526426c32e138c11538f89b6b1f",
+      "change": "namespace relocation; public Core SDK binding; Windows path normalization; explicit container typing",
+      "current_sha256": "a10018b408070a544c3cb4739947f4426a684526426c32e138c11538f89b6b1f"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/memory/card_storage.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/memorylib/card_storage.py",
+      "sha256": "a3fd34b23a57b3724ad71705798142a1c02b391b9d716da10f5d3d70a1461b7c",
+      "change": "namespace relocation; public Core SDK binding; Windows path normalization; explicit container typing",
+      "current_sha256": "9b99853cd26688a4845d258864a9e7d331f6110f2014a28c41fbf672b9cacc15"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/memory/case_format.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/memorylib/case_format.py",
+      "sha256": "6e648df1b2466a71e28b6ee5236f0e995be604658603ed0898aac21acb1b3785",
+      "change": "namespace relocation; public Core SDK binding; Windows path normalization; explicit container typing",
+      "current_sha256": "11dcabecb33214af2a8ca683c09f6293d5248e98ec7adf8bb1f0c6878f341be9"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/memory/cases.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/memorylib/cases.py",
+      "sha256": "ebceec32263eac54d29002429f6a1abbfd0fab334dc5e52efe9d2ddccc33202f",
+      "change": "namespace relocation; public Core SDK binding; Windows path normalization; explicit container typing",
+      "current_sha256": "0d74a1a55c12f7e06115e17ecf0b91298b548d43f9dd27ca55483739d727e40c"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/memory/common.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/memorylib/common.py",
+      "sha256": "ee542d2b7f1f53bb14afd3f65d594e6f1eb7cd63cd0609cf34d98a0f89cc0961",
+      "change": "namespace relocation; public Core SDK binding; Windows path normalization; explicit container typing",
+      "current_sha256": "4855eeb99c69509eff3d3f06bd9669c10ff62102705b235f71336d0aacc65967"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/memory/environment.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/memorylib/environment.py",
+      "sha256": "57176bd1216fe17c8fb6776c4b46a57c13949e436d0ccbf5fa68e5aa7d9d7abc",
+      "change": "default explicit environment facts only; original domain parser isolated as optional extension",
+      "current_sha256": "2bdef99bfbc414ede76199b4c1abab9de47ba42a87aae1768efbbd49765ab477"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/memory/inquiry_runtime.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/memorylib/inquiry_runtime.py",
+      "sha256": "bbc0d1f7296329b75551256ad516f88e68e08cbbd5ea12af816995798c121cee",
+      "change": "namespace relocation; public Core SDK binding; Windows path normalization; explicit container typing",
+      "current_sha256": "c9cf959028723b18d7a0cfb032ffd17dc3f153ab39e89bd63155a6f528aeb43b"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/memory/lean_card.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/memorylib/lean_card.py",
+      "sha256": "ab5aadf1c9e00319e28557130fa173c27b204a78b716ab872c34f1459675b07c",
+      "change": "namespace relocation; public Core SDK binding; Windows path normalization; explicit container typing",
+      "current_sha256": "d326fa86778675d0149f656e67df5bd1872496c5574d6673548a5d99536d0efd"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/memory/provenance.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/memorylib/provenance.py",
+      "sha256": "9d07e455abf3d215f82bb33a0ff8448ae3440cd241b694a892499093bfe8c56a",
+      "change": "namespace relocation; public Core SDK binding; Windows path normalization; explicit container typing",
+      "current_sha256": "f503592fe698053de7b8b9fe374f004a2049e2a9cb2d64314eb56d675e3fb54c"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/memory/publication.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/memorylib/publication.py",
+      "sha256": "d8ca19efa4f8a8ca450127390581243ee48f627fb3c4a2e8035e990a335d7b7f",
+      "change": "namespace relocation; public Core SDK binding; Windows path normalization; explicit container typing",
+      "current_sha256": "6e05dcb27d169861b1d2b1b33655a894a9f99e858d66510aa87e849d26106050"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/memory/registry.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/memorylib/registry.py",
+      "sha256": "f61d06e1018e2f7cdb9b9a6be3c439efe9624cac72b970a7325b68bf32d69365",
+      "change": "namespace relocation; public Core SDK binding; Windows path normalization; explicit container typing",
+      "current_sha256": "9bbec92e0e1d6327d5d5cb6788bff906f9e2a3f879b952da4e801059b41b21ce"
+    },
+    {
+      "target": "components/learning/src/agentlineage_learning/memory/retrieval.py",
+      "repository": "fuxi-ailabs/migbot-server",
+      "commit": "207b9eb8934b82309b5dd2709c2eede868fc8bdc",
+      "source": "src/vendor/migloop_memory/runtime/memorylib/retrieval.py",
+      "sha256": "ba2ab1c2eefe3e5f97adaa8b7c9312e7e89aca870d71a5580bc80c43cd3d2722",
+      "change": "namespace relocation; public Core SDK binding; Windows path normalization; explicit container typing",
+      "current_sha256": "ba2ab1c2eefe3e5f97adaa8b7c9312e7e89aca870d71a5580bc80c43cd3d2722"
+    }
+  ],
+  "hash_semantics": "sha256: original pinned Git blob; current_sha256: extracted UTF-8 file bytes"
+}

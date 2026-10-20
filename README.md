@@ -6,6 +6,10 @@ Session-level observability for LLM coding agents: import agent session logs and
 
 ## Features
 
+- **AgentLineage API** — optional Python evidence engine in `agentlineage/`: immutable native-session snapshots, file lineage, evidence checks and exact source-coordinate lookup. Configure `AGENTLINEAGE_CORE_URL` to use `/api/lineage/core/*`; freeze a registered native Claude/Codex session with `POST /api/lineage/sessions/{sessionId}/snapshots`. See [architecture and API setup](docs/architecture.md#agentlineage-integration). The existing DSH adapter and optional Learning module live in the same repository.
+
+The [DSH Lineage plugin](agentlineage/integrations/dsh/README.md) now manages a local Core with the Profile lifecycle and an automatic port, reads current/historical native DSH v4 sessions through DSH's session service, and binds snapshots per conversation. Natural-language query, Viewer and report checks need no snapshot ID. External Core mode remains supported. Plugin `0.1.0-alpha.3` supports DSH `0.2.1-rc.2` and installation from the [Fuxi DSH plugin market](https://fuxi-ailabs.github.io/dsh-plugin-market/index.json); see the [market acceptance record](agentlineage/acceptance-evidence/dsh-market-alpha3.json).
+
 Import SQLite (opencode.db) or JSONL (native Claude Code / Codex `rollout-*.jsonl` / cpx proxy captures; plaintext, `.jsonl.7z` and legacy `.jsonl.gz`, `cpx-` prefix handled) and explore the session detail tabs:
 
 - **Tokens & Cost** — 5-item per-turn token breakdown vs the model's context window, plus cost estimation
