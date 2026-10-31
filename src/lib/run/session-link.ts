@@ -50,6 +50,7 @@ export async function joinSessionRefs(
     select: {
       id: true, taskId: true, framework: true, label: true,
       startTime: true, endTime: true, totalTokens: true, totalLatencyMs: true,
+      totalCost: true, model: true, version: true,
       totalCacheReadTokens: true,
     },
   });
@@ -102,6 +103,10 @@ export async function joinSessionRefs(
       startTime: chosen.startTime ? chosen.startTime.toISOString() : null,
       endTime: chosen.endTime ? chosen.endTime.toISOString() : null,
       cacheReadTokens: chosen.totalCacheReadTokens,
+      totalCost: chosen.totalCost,
+      model: chosen.model,
+      totalLatencyMs: chosen.totalLatencyMs,
+      version: chosen.version,
       contextPeakPct: contextPeakByRow.get(chosen.id) ?? null,
     });
   }
