@@ -17,6 +17,8 @@ export interface RunMemberRow {
   framework: string;
   displayName: string;
   role: string;
+  /** manifest 成员名（SessionMemberRef.name）——无图结构时 memberShortNames 的回落源 */
+  memberName: string | null;
   nodeId: string;
   generation: number;
   attempt: number;
@@ -86,6 +88,7 @@ export function runMemberRowsOf(vm: RunViewModel): RunMemberRow[] {
       framework: ref.session.framework,
       displayName: "",
       role: ref.role,
+      memberName: ref.name,
       nodeId,
       generation,
       attempt,
@@ -110,7 +113,7 @@ export function runMemberRowsOf(vm: RunViewModel): RunMemberRow[] {
   const rows = [...bySid.values()];
   const names = memberShortNames(rows.map(r => ({
     taskId: r.taskId, nodeId: r.nodeId, generation: r.generation, attempt: r.attempt,
-    role: r.role, memberName: null,
+    role: r.role, memberName: r.memberName,
   })));
   rows.forEach((r, i) => { r.displayName = names[i] ?? r.taskId; });
   return rows;
