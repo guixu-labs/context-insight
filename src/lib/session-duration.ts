@@ -17,7 +17,7 @@ function toMs(t: TimeInput): number | null {
 // 会话墙钟时长：startTime → endTime 的真实跨度。endTime 缺失或倒挂时
 // 回落 totalLatencyMs（Σ turn latency，含并行 subagent 双计，仅作兜底）。
 // 列表 / CLI / TUI 的 "Duration" 客户端用本函数 + 已有 start/end/Σ 字段自算，
-// 无需 API 派生冗余字段。全局 Avg Duration 服务端聚合也用本函数。
+// 无需 API 派生冗余字段。全局 Total Duration 服务端聚合也用本函数。
 export function sessionDurationMs(
   startTime: TimeInput,
   endTime: TimeInput,

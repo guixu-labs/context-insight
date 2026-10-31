@@ -69,7 +69,7 @@ export interface ClaudeJsonlLine {
   // system-reminder 包装。其余 attachment 子类型仍是纯元数据
   attachment?: AttachmentLike;
   // x_lake 信封字段：读方一律经 shared/envelope readEnvelope 解析
-  // （键名唯一定义处），此处不再逐字段声明
+  // 解析（键名与优先级单一真身），此处不再逐字段声明
 }
 
 export interface XLake {
@@ -540,10 +540,10 @@ export function listSubagentSessions(dirPath: string, sessionId: string): Claude
         const filePath = path.join(subagentsDir, entry.name);
         const meta = readSubagentMeta(filePath);
         // codex-proxy 身份对齐：文件名 id（sub-<hash>）是 cpx 在 spawn 输出
-        // 到达前铸的占位，真实 agentId 由 meta backfill——bridge-builder 按
+        // 到达前铸的占位，真身 agentId 由 meta backfill——bridge-builder 按
         // spawn 输出的 agent_id 锚定，规范 id 必须用 agentId 才能和 Bridge/
         // Execution 对上（否则泳道/性能视图全部 0 turns）。claude 捕获无
-        // agentId，回退文件名 id（= 真实会话 id，行为不变）。
+        // agentId，回退文件名 id（= 真身会话 id，行为不变）。
         results.push({
           id: meta?.agentId ?? m[1],
           filePath,

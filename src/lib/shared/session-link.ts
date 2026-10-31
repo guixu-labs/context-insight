@@ -12,9 +12,10 @@
 // 与导入结果回读（服务端刚建行）；导入前的源声明（lake meta 的 agent 裸名）
 // 禁止预拼：捕获行入库时分类器会加 -proxy 记录类后缀，预拼链接必然 404，
 // 而同 sid 双行下解析端模糊回退会静默跳错记录——消歧只能靠链接正确。
+// 会话以 solo run 形态打开 run 统一工作台（run-first）。
 export function sessionHref(taskId: string, framework?: string | null): string {
   const fw = framework ? `?framework=${encodeURIComponent(framework)}` : '';
-  return `/session/${encodeURIComponent(taskId)}${fw}`;
+  return `/run/solo:${encodeURIComponent(taskId)}${fw}`;
 }
 
 // 同一身份契约的 API 查询串形态（observe API 消歧参数）——凡按

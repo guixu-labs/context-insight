@@ -9,6 +9,7 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
+import { BRAND_SOURCE_TYPE, isBrandSourceType } from '@/lib/branding';
 import { getSource, sourceOfFramework, detectSourceByContent } from './adapters/registry';
 import { listSubagentSessionsWithDb, readSessionWithDb, readSessionMeta } from './adapters/opencode-db';
 import { extractVersion as extractClaudeVersion } from './adapters/claude-jsonl';
@@ -35,12 +36,15 @@ function toDate(v: string | null): Date | null {
 
 /** 行的记录类（framework 身份，方案一：同 sid 原生/proxy 各一行）：
  * - proxy 行（version 带 marker）按 version 推导——映射与分类器同源，
- *   framework 误标史不参与判定（容器身份冒充期的存量行保持原值——
- *   旧值随品牌契约退役，身份在目标库已丢失，此分支只按 version 推导；
- *   导入链已改走 readSessionMeta 会话级声明，新行不再产生误标值）
+ *   framework 误标史不参与判定；存量误标行（容器身份冒充期落库的
+ *   cannbot-insight，可能带 -proxy version——导出自捕获会话）保持原值
+ *   （legacy shim：身份在目标库已丢失，重导出件即正确，此分支只护存量
+ *   显示；导入链已改走 readSessionMeta 会话级声明，新行不再产生该值）
  * - 非 proxy 行原样 framework */
 function recordingClassOfSessionRow(row: { framework: string; version: string | null }): string {
   if (isProxyVersion(row.version)) {
+    // 品牌容器标识（含存量旧值 cannbot-insight）归一为当前 BRAND_SOURCE_TYPE
+    if (isBrandSourceType(row.framework)) return BRAND_SOURCE_TYPE;
     return proxyRecordingFrameworkFromVersion(row.version) ?? row.framework;
   }
   return row.framework;
@@ -52,6 +56,37 @@ function previewText(text: string | null | undefined): string | null {
   if (!text) return null;
   const stripped = text.replace(/^<system-reminder>[\s\S]*?<\/system-reminder>\s*/, '').trim();
   return truncateUtf16Safe(stripped || text, 200);
+}
+
+// 子代理块按「块内最早交互时刻」升序并入主流：主时间线在前、子代理整块
+// 追加的结构不变，块序从源侧发现序（opencode 双表 union / claude 目录序，
+// 实测常为建会话倒序——晚派发的块先并入，全局 turnIndex 与真实时间逆行，
+// 现场读作「后来的 turn 数字大」）改为派发正序。排序只在块粒度：块内序列
+// 不动——上下文内位次是合并/刷新的稳定身份键（merge.ts rankedKey），块序
+// 重排不影响增量匹配。异步子代理同样安全：排序键是子代理自己开跑的时刻
+// （timeInfo.created），与主时间线无耦合。无时间戳的块排尾部，稳定排序
+// 保发现序。
+export function appendSubagentBlocksOrdered(
+  allRawInteractions: RawInteraction[],
+  subInteractions: RawInteraction[],
+): void {
+  const blocks = new Map<string, RawInteraction[]>();
+  for (const r of subInteractions) {
+    const sid = r.subagent_session_id ?? '';
+    const list = blocks.get(sid) ?? [];
+    list.push(r);
+    blocks.set(sid, list);
+  }
+  const keyed = [...blocks.values()].map((block, i) => ({
+    block,
+    i,
+    firstMs: block.reduce<number | null>((m, r) => {
+      const c = r.timeInfo?.created;
+      return typeof c === 'number' && Number.isFinite(c) ? (m === null ? c : Math.min(m, c)) : m;
+    }, null),
+  }));
+  keyed.sort((a, b) => (a.firstMs ?? Infinity) - (b.firstMs ?? Infinity) || a.i - b.i);
+  for (const { block } of keyed) allRawInteractions.push(...block);
 }
 
 // 首真人查询（会话 label/query 来源）。注入分类后（adapter 侧
@@ -439,37 +474,6 @@ export function computeSessionAggregates(
     endTime,
     model,
   };
-}
-
-// 子代理块按「块内最早交互时刻」升序并入主流：主时间线在前、子代理整块
-// 追加的结构不变，块序从源侧发现序（opencode 双表 union / claude 目录序，
-// 实测常为建会话倒序——晚派发的块先并入，全局 turnIndex 与真实时间逆行，
-// 现场读作「后来的 turn 数字大」）改为派发正序。排序只在块粒度：块内序列
-// 不动——上下文内位次是合并/刷新的稳定身份键（merge.ts rankedKey），块序
-// 重排不影响增量匹配。异步子代理同样安全：排序键是子代理自己开跑的时刻
-// （timeInfo.created），与主时间线无耦合。无时间戳的块排尾部，稳定排序
-// 保发现序。
-export function appendSubagentBlocksOrdered(
-  allRawInteractions: RawInteraction[],
-  subInteractions: RawInteraction[],
-): void {
-  const blocks = new Map<string, RawInteraction[]>();
-  for (const r of subInteractions) {
-    const sid = r.subagent_session_id ?? '';
-    const list = blocks.get(sid) ?? [];
-    list.push(r);
-    blocks.set(sid, list);
-  }
-  const keyed = [...blocks.values()].map((block, i) => ({
-    block,
-    i,
-    firstMs: block.reduce<number | null>((m, r) => {
-      const c = r.timeInfo?.created;
-      return typeof c === 'number' && Number.isFinite(c) ? (m === null ? c : Math.min(m, c)) : m;
-    }, null),
-  }));
-  keyed.sort((a, b) => (a.firstMs ?? Infinity) - (b.firstMs ?? Infinity) || a.i - b.i);
-  for (const { block } of keyed) allRawInteractions.push(...block);
 }
 
 // 会话级导入边界日志（start/done/failed 三件套 + sid 归属）：并发/失败场景

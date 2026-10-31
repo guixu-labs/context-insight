@@ -3,7 +3,7 @@
 // CANN Open Software License Agreement Version 2.0 (the "License").
 // You may refer to the License for details. You may not use this file except in compliance with the License.
 // THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
-// INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+// INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
 // See LICENSE in the root of the software repository for the full text of the License.
 
 // manifest 解析 + 校验 + 全树索引（纯函数，无 fs/DB）。对应原型引用的
@@ -44,7 +44,8 @@ export interface IndexedMember {
   /** 所属（子）workflow 的成员 id；根 data 的直接成员为 null。子图挂接
    * （gen-sub-graph）按「ownerWorkflowId + 成员代数」找生成器实例。 */
   ownerWorkflowId: string | null;
-  /** 归一后的 graph 注解；null = 无/坏注解（不进图，process 语义容忍） */
+  /** 归一后的 graph 定位（新格式 member 顶层字段；存量旧格式 annotation.graph
+   * 兼容读）。null = 无/坏定位（不进图，process 语义容忍） */
   graph: RunGraphAnnotation | null;
 }
 
@@ -57,11 +58,16 @@ export interface ResolvedRelation {
 export interface RunIndex {
   runId: string;
   manifest: RunManifest;
-  /** 全树扁平（含 workflow 成员） */
+  /** 全树扁平（含 workflow 成员——新格式下子图容器也是图节点） */
   members: IndexedMember[];
   membersById: Map<string, IndexedMember>;
   /** 带 graph 定位字段的成员 */
   graphMembers: IndexedMember[];
+  /** 观测作用域成员：成员资格 = 成员位引用了会话（sessionId 非空）；图定位
+   * 只是归因元数据（structure），不是入场券——无图 run / 部分定位 run 的
+   * 成员会话同样进观测面（泳道 root 道 / turns / bridges …）。图导航消费方
+   * （view-model / lookupByFiveKey）继续用 graphMembers。 */
+  sessionMembers: IndexedMember[];
   relations: ResolvedRelation[];
   warnings: string[];
 }
@@ -76,8 +82,8 @@ function nullableString(v: unknown): string | null {
   return typeof v === 'string' ? v : null;
 }
 
-/** 解析 + 类型归一。结构/枚举/条件必填已由受信任 schema 校验（validateBundleDir
- * 先行），此处不再手写结构校验。 */
+/** 解析 + 类型归一。结构/枚举/条件必填已由受信任的随包 schema 校验
+ * （validateBundleDir 先行），此处不再手写结构校验。 */
 export function parseManifest(json: unknown): RunManifest {
   if (!isObj(json)) {
     throw new ManifestParseError('not-an-object', 'workflow.json 根必须是 JSON 对象');
@@ -118,7 +124,8 @@ interface WalkResult {
 }
 
 /** 全树遍历：收集扁平结构、跨节点不变量（id 唯一）与警告。成员/关系结构
- * 已由包内 schema 保证，此处不做结构复检。 */
+ * 已由随包 schema 保证（导入闸），此处不做结构复检；存量 run 落盘件无
+ * schema 复检，坏结构的兜底 = buildIndex 的端点解析/索引空集。 */
 function walkTree(data: RunWorkflowData, ownerWorkflowId: string | null, out: WalkResult): void {
   for (const raw of data.members) {
     if (out.members.some(m => m.member.id === raw.id)) {
@@ -126,7 +133,8 @@ function walkTree(data: RunWorkflowData, ownerWorkflowId: string | null, out: Wa
     }
     const kind = raw.kind;
 
-    // 图定位字段位于 member 顶层，role 位于自由 annotation。
+    // 图定位字段位于 member 顶层，role 位于自由 annotation；存量旧格式整体
+    // 在 annotation.graph——顶层优先，缺失时回退旧位（存量 run 兼容读）。
     let graph: RunGraphAnnotation | null = null;
     const ann = isObj(raw.annotation) ? raw.annotation : undefined;
     if (raw.nodeId !== undefined || raw.generation !== undefined || raw.attempt !== undefined) {
@@ -140,6 +148,13 @@ function walkTree(data: RunWorkflowData, ownerWorkflowId: string | null, out: Wa
         graph = g;
       } else {
         out.warnings.push(`成员 ${raw.id} 的图定位字段或 annotation.role 不合法，按无图定位成员对待`);
+      }
+    } else if (ann && isObj(ann.graph)) {
+      const g = normalizeGraphAnnotation(ann.graph);
+      if (g) {
+        graph = g;
+      } else {
+        out.warnings.push(`成员 ${raw.id} 的 annotation.graph 五键字段不合法，按无注解成员对待`);
       }
     }
 
@@ -174,7 +189,7 @@ function walkTree(data: RunWorkflowData, ownerWorkflowId: string | null, out: Wa
     }
   }
   for (const raw of data.relations) {
-    out.relations.push(raw);
+    out.relations.push(raw as RunRelation);
   }
 }
 
@@ -221,6 +236,7 @@ export function buildIndex(manifest: RunManifest): RunIndex {
     members: out.members,
     membersById,
     graphMembers: out.members.filter(m => m.graph !== null),
+    sessionMembers: out.members.filter(m => typeof m.member.sessionId === 'string' && m.member.sessionId.length > 0),
     relations,
     warnings: out.warnings,
   };

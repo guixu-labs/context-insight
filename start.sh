@@ -11,17 +11,6 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# 数据目录迁移：cannbot 时代（≤0.2.40）的 ~/.cannbot-insight 首启原子改名到
-# ~/.context-insight（与 bin/context-insight.mjs 同款幂等逻辑；显式
-# CONTEXT_INSIGHT_HOME / CONTEXT_PROXY_DIR 覆盖 = 用户自管目录，不掺和；
-# 两目录并存时沿用新目录不动旧目录）。
-if [ -z "${CONTEXT_INSIGHT_HOME:-}" ] && [ -z "${CONTEXT_PROXY_DIR:-}" ] \
-   && [ -d "$HOME/.cannbot-insight" ] && [ ! -e "$HOME/.context-insight" ]; then
-  if mv "$HOME/.cannbot-insight" "$HOME/.context-insight" 2>/dev/null; then
-    echo "[start.sh] 数据目录已迁移: $HOME/.cannbot-insight → $HOME/.context-insight"
-  fi
-fi
-
 # 启动器统一日志：与 TS 侧 logger 同款格式 [time][level][module]:message。
 # 屏幕恒显（启动器 UX 不受日志开关影响）；同时追加统一日志文件
 # （~/.context-insight/logs 或 CONTEXT_LOG_DIR），env CONTEXT_LOG /
@@ -501,7 +490,7 @@ if [ "$CLI" = true ]; then
   slog INFO start "CLI exited, backend stopped"
 else
   # 服务端输出直接上屏（终端实时看 next 自身输出与统一日志的 stdout 通道）；
-  # 持久化由统一日志文件通道承担（~/.cannbot-insight/logs/），tmp/next-*.log
+  # 持久化由统一日志文件通道承担（~/.context-insight/logs/），tmp/next-*.log
   # 不再留服务期副本（用户选择：文件日志已有，屏幕直出即可）
   npx next $NEXT_CMD -H 127.0.0.1 --port $PORT 2>&1 &
   NEXT_PID=$!

@@ -2,7 +2,7 @@
 // 嵌入式导出 bundle 的入口：挂载 SessionDetailPage，fetch 拦截器返回内嵌数据
 import React from "react"
 import { createRoot } from "react-dom/client"
-import SessionDetailPage from "../app/session/[taskId]/page"
+import SessionDetailPage from "@/components/export-view/SessionExportViewer"
 
 // file:// 下 EventSource/SSE 会报安全错误；导出快照无需实时刷新，no-op 掉
 class EventSourceShim {

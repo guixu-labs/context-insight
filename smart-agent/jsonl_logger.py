@@ -8,7 +8,7 @@
 """Claude Code JSONL 格式日志器。
 
 逐行写 JSONL，字段与 Claude Code session 日志（~/.claude/projects/*/*.jsonl）一致，
-CANNBot-Insight 的 claude-jsonl 适配器可直接解析。
+Context-Insight 的 claude-jsonl 适配器可直接解析。
 
 行类型映射：
   - 初始 prompt          → user 消息（content=string）

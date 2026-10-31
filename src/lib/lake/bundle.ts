@@ -7,25 +7,26 @@
 // See LICENSE in the root of the software repository for the full text of the License.
 
 // bundle 编排层（lake-bundle 板块）：
-// list / upload / import。bundle = opsbot workflow 包（workflow.json +
-// sessions/），仓内布局 opsbot-bundle/<runId>/（mirror 层三函数）。上传数据流
-// （与会话上传同款「导入后上传」——数据源 = insight，sessions/runs 归一基础）：
-// 已导入 run → staging（run 目录 manifest/report 落盘件 + 成员会话按
-// stageInsightSession 装配〔本机源直传优先、DB 导出兜底〕+ 合成
-// bundle.meta.json）→ 治理（jsonl 全量清洗 + .json 深度清洗 + 复检熔断 +
+// list / upload / import。bundle = opsbot workflow 包（workflow.json + report.json +
+// sessions/），统一布局物理位置 <范式>/<runId>/（目录即目录，与会话资产
+// 同款「位置即身份」；缺省根级，历史专区 opsbot-bundle/ 锚定规则同构兼容）。
+// 上传数据流（与会话上传同款「导入后上传」——数据源 = insight，sessions/
+// runs 归一基础）：已导入 run → staging（run 目录 manifest/report 落盘件 +
+// 成员会话按 stageInsightSession 装配〔本机源直传优先、DB 导出兜底〕+
+// 合成 bundle.meta.json）→ 治理（jsonl 全量清洗 + .json 深度清洗 + 复检熔断 +
 // 大小限）→ mirror.push。导入 = 物化（mirror）→ 解压回明文 → run 域
 // import-service job 管线（复用）。不涉及 cpx 捕获语义——bundle 内会话正文
 // 即普通 claude-jsonl 件。
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { listBundles, materializeBundle, uploadBundleFolder, type LakeRemote, type LakeBundleEntry, type UploadResult } from './mirror';
+import { listBundles, materializeBundle, uploadBundleFolder, ensureLfsBootstrapForRead, type LakeRemote, type LakeBundleEntry, type UploadResult } from './mirror';
 import { defaultLakeRemote } from './remote';
 import { requirePushCredentials } from './auth';
 import { parseSubmitInfo, extractSubmitter } from './notes';
 import { governText, redactInPlace, scanResidue, GovernanceError, MAX_SESSION_BYTES } from './governance';
 import { xLake } from './export';
-import { stageInsightSession, type SessionRow } from './index';
+import { stageInsightSession, validateCategory, type SessionRow } from './index';
 import { envelopeFields } from '../shared/envelope';
 import { decompressToPlain, compressCaptureFile } from '@/lib/compression';
 import { validateBundleDir, createImportJob, getImportJob, type ImportJobState } from '@/lib/run/import-service';
@@ -33,7 +34,7 @@ import { readRun, runsRoot, runDir } from '@/lib/run/run-store';
 import { WORKFLOW_SCHEMA_FILE, type RunWorkflowData, type RunMember } from '@/lib/run/model';
 import { createLogger } from '@/lib/logger';
 import type { PrismaClient } from '@prisma/client';
-import { BUNDLE_MANIFEST_FILE, BUNDLE_META_FILE } from './bundle-layout';
+import { BUNDLE_MANIFEST_FILE, BUNDLE_REPORT_FILE, BUNDLE_META_FILE } from './bundle-layout';
 
 const bundleLog = createLogger('lake-bundle');
 
@@ -75,14 +76,17 @@ function collectSessionMembers(data: RunWorkflowData): { sessionId: string; loca
 }
 
 /** 上传时合成 bundle.meta.json（cc-bundle-meta，x_lake 信封）：提交信息
- *  快照（与 commit message 同源同值）+ 展示快照（name/规模），列表
- *  归属的权威字段（读方 meta 优先、git log 推导回落——与会话 meta 同款）。 */
+ *  快照（与 commit message 同源同值）+ 展示快照（name/status/规模）+ opGen
+ *  标注（上传表单与 session 同款必选项）。范式不入 meta——位置即身份
+ *  （bundle 落 <范式>/<runId>/，列表范式由目录推导，与会话同源）。 */
 function synthesizeBundleMeta(
   stagingBundle: string,
   runId: string,
   manifest: { name?: string | null },
+  reportTotals: { members?: number; session_files?: number } | null,
   sessionCount: number,
   description: string | null,
+  opGen?: 'success' | 'failure',
 ): void {
   const submit = parseSubmitInfo(description);
   const data: Record<string, unknown> = { runId, uploadedAt: new Date().toISOString() };
@@ -91,6 +95,8 @@ function synthesizeBundleMeta(
   if (submit.remark) data.remark = submit.remark;
   if (typeof manifest.name === 'string' && manifest.name) data.name = manifest.name;
   if (sessionCount > 0) data.sessionCount = sessionCount;
+  if (reportTotals?.members != null) data.memberCount = reportTotals.members;
+  if (opGen) data.opGen = opGen;
   fs.writeFileSync(
     path.join(stagingBundle, BUNDLE_META_FILE),
     JSON.stringify(envelopeFields(xLake('cc-bundle-meta', data)), null, 2) + '\n',
@@ -183,21 +189,27 @@ export interface BundleUploadResult extends UploadResult {
   warnings: string[];
 }
 
-/** 已导入 run 整包上传数据仓 opsbot-bundle/<runId>/（原子整体替换）。数据源
- *  = insight（与会话上传同款「导入后上传」链路）：manifest 取 run
- *  目录落盘件，成员会话按
- *  stageInsightSession 装配（本机源直传优先、DB 导出兜底）。 */
+/** 已导入 run 整包上传数据仓 <范式>/<runId>/（原子整体替换；换目录重传 =
+ *  旧位置同 commit 迁移删除，runId 全仓唯一）。数据源 = insight（与会话上传
+ *  同款「导入后上传」链路）：manifest/report 取 run 目录落盘件（report 回落
+ *  源目录，旧 run 兼容），成员会话按 stageInsightSession 装配（本机源直传
+ *  优先、DB 导出兜底）。category/opGen（上传表单与 session 同款必选项）：
+ *  category 是物理落点（位置即身份），opGen 落 bundle.meta.json + commit
+ *  message 范式行（与人读 git log 同源）。 */
 export async function uploadLakeBundle(
   prisma: PrismaClient,
   runId: string,
   description: string | undefined,
   remote?: LakeRemote,
+  category?: string,
+  opGen?: 'success' | 'failure',
 ): Promise<BundleUploadResult> {
   if (!/^[\w.-]+$/.test(runId)) throw new Error(`Invalid bundle id: "${runId}"`);
   const { submitter, error: submitterError } = extractSubmitter(description);
   if (submitterError) throw new Error(submitterError);
   const rem = remote ?? defaultLakeRemote();
   requirePushCredentials(rem.pushUrl, rem.pushAuth);
+  const categoryValue = validateCategory(rem, category);
   const stored = readRun(runId);
   if (!stored) throw new Error(`Run "${runId}" 未导入——上传数据源是已导入的 run，请先在 Runs 页导入 bundle`);
 
@@ -218,6 +230,17 @@ export async function uploadLakeBundle(
       throw new Error(`Run "${runId}" 缺 ${WORKFLOW_SCHEMA_FILE}（旧版本导入的 run，无随包 schema）——请用带 schema 的 bundle 重新导入后上传`);
     }
     fs.copyFileSync(schemaSrc, path.join(stagingBundle, WORKFLOW_SCHEMA_FILE));
+    // report：导入时随行副本优先，旧 run 回落源目录；两处皆无 = 不带 report（可选件）
+    const sourceDir = stored.meta?.data.sourceDir;
+    const reportSrc = [path.join(dir, BUNDLE_REPORT_FILE), sourceDir ? path.join(sourceDir, BUNDLE_REPORT_FILE) : '']
+      .find(p => p && fs.existsSync(p));
+    let reportTotals: { members?: number; session_files?: number } | null = null;
+    if (reportSrc) {
+      fs.copyFileSync(reportSrc, path.join(stagingBundle, BUNDLE_REPORT_FILE));
+      try {
+        reportTotals = ((JSON.parse(fs.readFileSync(reportSrc, 'utf8')) as { totals?: { members?: number; session_files?: number } }).totals) ?? null;
+      } catch { /* report 畸形：快照规模留空，不阻断上传 */ }
+    }
 
     const missingSessions: string[] = [];
     let sessionCount = 0;
@@ -234,12 +257,13 @@ export async function uploadLakeBundle(
       sessionCount += 1;
     }
 
-    synthesizeBundleMeta(stagingBundle, runId, stored.manifest, sessionCount, description ?? null);
+    synthesizeBundleMeta(stagingBundle, runId, stored.manifest, reportTotals, sessionCount, description ?? null, opGen);
     governStagedBundle(stagingBundle, runId);
-    const commitMessage = description!.trim() + `\n\nbundle: ${runId}`;
-    const result = await uploadBundleFolder(stagingRoot, runId, commitMessage, rem);
+    // 范式行由结构化字段注入（与会话上传同款；git %s 折叠 subject，须放空行后 body）
+    const commitMessage = description!.trim() + (categoryValue ? `\n\n范式: ${categoryValue}` : '') + `\n\nbundle: ${runId}`;
+    const result = await uploadBundleFolder(stagingRoot, runId, commitMessage, rem, categoryValue);
     const warnings = missingSessions.map(sid => `成员会话 ${sid} 不在 insight（导入缺文件或已删除），包内缺该正文`);
-    bundleLog.info('bundle upload done', { runId, submitter, unchanged: result.unchanged, sessions: sessionCount, missing: missingSessions.length, ms: Date.now() - t0 });
+    bundleLog.info('bundle upload done', { runId, submitter, category: categoryValue ?? '', opGen: opGen ?? null, unchanged: result.unchanged, sessions: sessionCount, missing: missingSessions.length, ms: Date.now() - t0 });
     return { ...result, runId, sessionCount, missingSessions, warnings };
   } finally {
     fs.rmSync(stagingRoot, { recursive: true, force: true });
@@ -252,18 +276,24 @@ export interface BundleImportHandle {
 }
 
 /** 从数据仓导入 bundle：物化 → 解压回明文 → run 域导入 job（fire-and-forget，
- *  轮询 getImportJob；物化目录由 job 终态自清理）。 */
-export function importLakeBundle(
+ *  轮询 getImportJob；物化目录由 job 终态自清理）。paradigm（可选）= 所在
+ *  顶层目录（''=根级）：给定即精确物化；缺省 runId 全仓锚定搜索。
+ *  异步：LFS 模式下物化前自举 git-lfs（materializeBundle 是同步函数无法
+ *  内嵌；仓内指针 blob 的 --filters smudge 依赖它）——导入与上传同享
+ *  「零手工安装」。 */
+export async function importLakeBundle(
   runId: string,
   opts?: { prisma?: PrismaClient; root?: string },
   remote?: LakeRemote,
-): BundleImportHandle {
+  paradigm?: string,
+): Promise<BundleImportHandle> {
   if (!/^[\w.-]+$/.test(runId)) throw new Error(`Invalid bundle id: "${runId}"`);
   const rem = remote ?? defaultLakeRemote();
+  if (rem.lfs) await ensureLfsBootstrapForRead();
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), `lake-bundle-import-${runId}-`));
   let bundleDir: string;
   try {
-    bundleDir = materializeBundle(runId, path.join(tmpRoot, runId), rem);
+    bundleDir = materializeBundle(runId, path.join(tmpRoot, runId), rem, paradigm);
     // 压缩态 → 明文：还原成与本地 bundle 目录同构（import-service 消费明文 .jsonl）
     for (const rel of fs.readdirSync(bundleDir, { recursive: true, withFileTypes: true })) {
       if (!rel.isDirectory() && (rel.name.endsWith('.jsonl.7z') || rel.name.endsWith('.jsonl.gz'))) {
