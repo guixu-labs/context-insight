@@ -123,15 +123,10 @@ async function computeSystemOverhead(sessionId: string, subagentSessionId: strin
     select: { id: true, role: true, content: true },
   });
 
-  // Include tool call args tokens for prior assistant turns
-  const priorAssistantIds = priorMessages.filter(ct => ct.role === 'assistant').map(ct => ct.id);
-  const priorToolCalls = priorAssistantIds.length > 0 ? await prisma.toolCall.findMany({
-    where: { turnId: { in: priorAssistantIds } },
-    select: { turnId: true, argsJson: true },
-  }) : [];
-  const toolArgsTokens = priorToolCalls.reduce((s, tc) => s + Math.round((tc.argsJson?.length ?? 0) / 3.5), 0);
-
-  const visibleEstimated = priorMessages.reduce((s, ct) => s + Math.round((ct.content?.length ?? 0) / 3.5), 0) + toolArgsTokens;
+  // firstAssistant is chosen by turnIndex asc, so no prior turn can be an
+  // assistant — the prior-assistant toolCall.findMany branch was dead code
+  // and has been removed. priorMessages only ever contains user/system turns.
+  const visibleEstimated = priorMessages.reduce((s, ct) => s + Math.round((ct.content?.length ?? 0) / 3.5), 0);
   const value = Math.max(0, firstAssistant.inputMessagesTokens - visibleEstimated);
   systemOverheadCache.set(cacheKey, value);
   return value;
