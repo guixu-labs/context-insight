@@ -22,6 +22,7 @@ import { parseManifest, buildIndex, type RunIndex } from './reader';
 import { MANIFEST_FILENAMES, WORKFLOW_SCHEMA_FILE, type RunManifest } from './model';
 import { validateWithBundleSchema } from './schema-validate';
 import { saveRun, runsRoot, readRun, isSafeRunId } from './run-store';
+import { BUNDLE_REPORT_FILE } from '../lake/bundle-layout';
 
 export interface BundleValidation {
   ok: boolean;
@@ -40,10 +41,10 @@ export function bundleManifestFile(dirPath: string): string {
 }
 
 /** 校验 bundle 目录（同步、可 4xx 快速失败，不起 job）。结构校验走包内
- * workflow.schema.json + parse + index（含关系端点解析），坏清单在入口拒绝
- * 而不是 job 中途炸。schema 是随包权威：导入时落盘 runs/<id>、上传时原样
- * 进仓，lake 重导入的包同样带 schema——不设豁免分支（存量无 schema 的仓
- * 内包不再兼容）。 */
+ * workflow.schema.json（哈希信任的随包权威）+ parse + index（含关系端点
+ * 解析），坏清单在入口拒绝而不是 job 中途炸。schema 随导入落盘 runs/<id>、
+ * 上传时原样进数据仓——仓内包恒带 schema，不设豁免分支（存量无 schema 的
+ * 仓内包不再兼容）。 */
 export function validateBundleDir(dirPath: string): BundleValidation {
   if (!dirPath || typeof dirPath !== 'string') {
     return { ok: false, status: 400, error: 'Missing required field: dirPath' };
@@ -78,8 +79,8 @@ export function validateBundleDir(dirPath: string): BundleValidation {
       reason: 'bundle-manifest-invalid-json',
     };
   }
-  // 结构校验只走包内 workflow.schema.json（单一权威随包分发）；缺 schema 或
-  // 结构不符都在此拒绝，不回落手写结构校验。
+  // 结构校验只走包内 workflow.schema.json（单一权威随包分发，哈希先行）；
+  // 缺 schema 或结构不符都在此拒绝，不回落手写结构校验。
   const schemaCheck = validateWithBundleSchema(dirPath, raw);
   if (!schemaCheck.ok) {
     return {
@@ -90,7 +91,7 @@ export function validateBundleDir(dirPath: string): BundleValidation {
     };
   }
   try {
-    // parseManifest（类型归一）+ buildIndex（关系端点解析）
+    // parseManifest（类型归一）+ buildIndex（跨节点不变量：id 唯一/关系端点解析）双闸
     const manifest = parseManifest(raw);
     // id 即 run 目录名（runs/<id>）：入口同步拒绝非法目录名，避免 job 中途在 saveRun 炸
     if (!isSafeRunId(manifest.id)) {
@@ -304,6 +305,12 @@ export async function runImportJob(
     },
     rootDir,
   );
+  // report.json 随行落 run 目录：run 级上传的数据源（源目录删除/移动后仍可
+  // 整包重传——上传数据源 = insight，与会话上传同款）
+  const reportSrc = path.join(dirPath, BUNDLE_REPORT_FILE);
+  if (fs.existsSync(reportSrc)) {
+    fs.copyFileSync(reportSrc, path.join(runDirPath, BUNDLE_REPORT_FILE));
+  }
   // 随包 schema 原样落盘（与 manifest 同存 run 目录）：上传链路据此把
   // schema 带进数据仓包。缺文件 = 结构校验未过，正常导入不会到这。
   const schemaSrc = path.join(dirPath, WORKFLOW_SCHEMA_FILE);

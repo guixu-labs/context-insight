@@ -25,7 +25,7 @@ import type { SessionListItem, RawInteraction } from '../../shared/types';
 //   存储）声明源级 framework 缺省；「格式即搬运」的容器源（context-insight
 //   导出件 = insight 序列化既有会话，不是会话的生产者）不声明源级框架——
 //   会话身份是会话级数据，必须经 readSessionMeta 从件内声明读取。容器源
-//   若让格式身份冒充会话身份（framework=容器源名），记录类匹配、
+//   若让格式身份冒充会话身份（framework='context-insight'），记录类匹配、
 //   deltaRefresh 反查路由、上传元数据三条链全部被污染（误标史）
 //
 // 框架级归一化原则（所有适配器必须遵守，serving 层依赖这些全局一致语义）：
@@ -71,8 +71,8 @@ export type UserInjectionClassifier = (
 // 布局 + meta.json，codex 走 spawn 输出 + parent_thread_id 交叉验证）
 export interface SubagentRef {
   /** 规范子会话 id（= RawInteraction.subagent_session_id，与 Bridge/
-   * Execution 的锚定键一致）。claude：文件名即真实会话 id；codex-proxy：
-   * cpx 铸的文件名 id 早于 spawn 输出到达，真实 agentId 由 meta backfill，
+   * Execution 的锚定键一致）。claude：文件名即真身会话 id；codex-proxy：
+   * cpx 铸的文件名 id 早于 spawn 输出到达，真身 agentId 由 meta backfill，
    * 以 agentId 为规范 id（文件名 id 仅存于 filePath） */
   id: string;
   /** 子会话文件路径 */

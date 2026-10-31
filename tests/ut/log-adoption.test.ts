@@ -23,11 +23,22 @@ describe('日志采用率哨兵：所有 route.ts 必须有错误日志通道', 
   it('每个路由要么包 withRouteLog，要么 catch 内有显式 logger 调用', () => {
     expect(routes.length).toBeGreaterThan(40);
     const violations: string[] = [];
+    // 接线层 route（纯 re-export @/lib/observe/session-handlers/*）：执行体
+    // 与日志通道都在 handler 文件里，哨兵跟随 re-export 检查 handler——
+    // handler 缺通道同样红（接线不是绕过哨兵的后门）。
+    const hasChannel = (src: string) =>
+      /withRouteLog/.test(src) || /log(Error|Warn|Info|Debug|Line)\s*\(/.test(src);
     for (const file of routes) {
       const src = fs.readFileSync(file, 'utf8');
-      const wrapped = /withRouteLog/.test(src);
-      const manualLog = /log(Error|Warn|Info|Debug|Line)\s*\(/.test(src);
-      if (!wrapped && !manualLog) violations.push(path.relative(PKG, file));
+      let covered = hasChannel(src);
+      if (!covered) {
+        const m = src.match(/from '(@\/lib\/observe\/session-handlers\/[a-z0-9-]+)'/);
+        if (m) {
+          const handlerFile = path.join(PKG, 'src', 'lib', 'observe', 'session-handlers', `${path.basename(m[1])}.ts`);
+          covered = hasChannel(fs.readFileSync(handlerFile, 'utf8'));
+        }
+      }
+      if (!covered) violations.push(path.relative(PKG, file));
     }
     expect(violations, `无错误日志通道的路由：\n${violations.join('\n')}`).toEqual([]);
   });

@@ -157,7 +157,8 @@ export function listRuns(root?: string): { runs: RunListItem[]; warnings: string
 
 export function toListItem(stored: StoredRun): RunListItem {
   const vm = buildViewModel(stored.index);
-  const sessionMembers = stored.index.graphMembers.filter(m => m.member.sessionId);
+  // 会话成员数 = 引用了会话的成员位（图注解可选；与观测作用域同口径）
+  const sessionMembers = stored.index.sessionMembers;
   return {
     runId: stored.runId,
     name: stored.manifest.name ?? null,

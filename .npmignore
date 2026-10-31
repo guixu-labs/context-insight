@@ -65,6 +65,5 @@ npm-debug.log*
 # smart-agent Python 缓存与测试（保留源码 server.py 等）
 smart-agent/tests/
 
-# 品牌变体打包工作区（scripts/pack-cannbot.mjs 的 staging）
-.context-pack/
+# cannbot 品牌变体打包工作区（scripts/pack-cannbot.mjs）
 .cannbot-pack/

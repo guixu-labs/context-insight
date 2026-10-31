@@ -7,7 +7,7 @@
 // See LICENSE in the root of the software repository for the full text of the License.
 
 // 导入 UI 元数据（agent-source-framework）：纯数据模块，无 node 依赖，
-// 客户端组件（LocalFileImport）可安全 import。此前 source 选项/快捷路径/
+// 客户端组件（ImportDialog）可安全 import。此前 source 选项/快捷路径/
 // placeholder 硬编码在组件里，新源接入还要动 UI——现在数据在这声明。
 
 export interface ImportSourceQuickDir {

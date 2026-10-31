@@ -26,7 +26,7 @@ import { defaultLakeRemote } from './remote';
 import { redactRemoteSecrets } from './remote';
 import type { LakeRemote } from './remote';
 import { requirePushCredentials } from '@/lib/lake/auth';
-import { readEnvelopeWithLegacy, envelopeFields } from '@/lib/shared/envelope';
+import { readEnvelope, envelopeFields } from '@/lib/shared/envelope';
 import { createLogger } from '@/lib/logger';
 
 const notesLog = createLogger('lake:notes');
@@ -59,7 +59,7 @@ export type LakeRecord = NoteEntry | ScorecardEntry
 export interface SessionSubmitInfo { author: string | null; description: string | null; remark: string | null }
 
 // 提交人网关（会话与 bundle 上传共用）：commit message 需含「提交人:<姓名>」。
-// 提交人强制非空 —— 空提交人的 commit author 会顶替为机器身份 context-insight，
+// 提交人强制非空 —— 空提交人的 commit author 会顶替为机器身份 cannbot-insight，
 // 列表"用户名"列失真。网关层校验，Web/CLI/TUI 三端统一拦截。
 // 行内匹配：\s* 不跨行（\s 含 \n 会让"提交人:\n内容描述:x"吃下一行冒名通过）
 export function extractSubmitter(description: string | undefined): { submitter: string; error: string | null } {
@@ -221,7 +221,7 @@ async function readMetaSubmitSnapshot(s: SessionLoc, dir: string, remote: LakeRe
   } catch { return null; }
   if (!text) return null;
   try {
-    const d = readEnvelopeWithLegacy(JSON.parse(text))?.data;
+    const d = readEnvelope(JSON.parse(text))?.data;
     if (!d || typeof d !== 'object') return null;
     const pick = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
     const snap: SessionSubmitInfo = { author: pick(d.submitter), description: pick(d.description), remark: pick(d.remark) };
@@ -412,7 +412,7 @@ export async function setOpGen(s: SessionLoc, value: OpGenValue, remote: LakeRem
     if (!old) return null;
     try {
       const meta = JSON.parse(old);
-      const srcEnv = readEnvelopeWithLegacy(meta);
+      const srcEnv = readEnvelope(meta);
       const data = srcEnv?.data;
       if (!data) return null;
       if (value == null) delete data.opGen;
