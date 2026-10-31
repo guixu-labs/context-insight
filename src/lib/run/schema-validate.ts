@@ -3,8 +3,14 @@
 // CANN Open Software License Agreement Version 2.0 (the "License").
 // You may refer to the License for details. You may not use this file except in compliance with the License.
 // THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
-// INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+// INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
 // See LICENSE in the root of the software repository for the full text of the License.
+
+// workflow.json 结构校验：只信「随包分发且哈希已登记」的 workflow.schema.json。
+// 结构/枚举/条件必填交给 ajv（draft-07）——单一权威随包分发，insight 不再手写
+// 结构与 opsbot 比对着漂移；reader 只保留 JSON Schema 表达不了的跨节点检查
+// （成员 id 全树唯一、关系端点解析）。包内缺 schema 文件直接失败（不回落
+// 手写）——旧导出件不支持。
 
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';

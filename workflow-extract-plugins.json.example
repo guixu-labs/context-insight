@@ -3,7 +3,7 @@
   "active": "workflow-ops",
   "plugins": {
     "workflow-ops": {
-      "description": "算子生成任务（ops workflow）的领域定制提取——STATE.md 任务清单 + workflow skill 编排规程",
+      "description": "算子生成任务（CANN ops workflow）的定制提取——STATE.md 任务清单 + workflow skill 编排规程",
       "regulation": {
         "resourceDirs": ["resources"],
         "turn0MinChars": 500,

@@ -91,6 +91,42 @@ export interface StageBreakdownRow {
   note?: string
 }
 
+/** 一个 skill 一次 audit 的完整报告（对应 pydantic AuditReport）。 */
+export interface AuditReport {
+  skill_name: string
+  transcripts: string[]
+  transcript_sources?: string[]
+  /** {total, pass, fail, na, unresolved, indeterminate}。 */
+  summary: {
+    total: number
+    pass: number
+    fail: number
+    na: number
+    unresolved?: number
+    indeterminate?: number
+  }
+  findings: AuditFinding[]
+  by_instruction?: InstructionAggregate[]
+  warnings?: string[]
+  /** refine（LLM 精筛伪指令）砍掉的条数。 */
+  refine_dropped_count?: number
+  /** 本次 audit 所有 LLM 判定调用的 token 用量合计（input/output/cache/cost/calls）。 */
+  token_usage?: Record<string, number>
+  /** audit 墙钟（秒）；stage_breakdown 各阶段秒数之和 ≈ 此值。 */
+  duration_seconds?: number
+  /** 各阶段耗时 + token，诊断慢在哪；refine/headline calls=0 时 note 标缓存命中/未启用。 */
+  stage_breakdown?: StageBreakdownRow[]
+  /** 声明指令覆盖总聚合（coverage 表数据；对应 pydantic CoverageSummary）。 */
+  coverage?: CoverageSummary
+  /** 声明文本覆盖视图（sift text_coverage 模块产）：对账结果回指上卷到声明原文单元（bullet/段落/代码块），三态着色。旧报告缺省（不显）。 */
+  text_coverage?: TextCoverageSummary
+  /** 对账时刻的声明原文快照；文本覆盖视图以此为渲染基准（声明事后被编辑不张冠李戴）。旧报告缺省。 */
+  skill_body?: string
+  /** sift `--run` 原生对账回填的 run 溯源（命中会话/调用数 + 审计单元映射）。 */
+  run?: AuditRunMeta
+}
+
+/** coverage 的单指令聚合（对应 pydantic InstructionCoverage）：该指令在全体 transcript 上的触达三态 + 计数。 */
 export interface InstructionCoverage {
   instruction_text: string
   source_excerpt?: string
@@ -108,6 +144,7 @@ export interface InstructionCoverage {
   seqs?: number[]
 }
 
+/** coverage 的单章节聚合（对应 pydantic SectionCoverage）：该节指令触达三态计数 + 明细。 */
 export interface SectionCoverage {
   section: string
   total?: number
@@ -118,23 +155,24 @@ export interface SectionCoverage {
   instructions: InstructionCoverage[]
 }
 
+/** 声明指令覆盖总聚合（对应 pydantic CoverageSummary；report.coverage）。 */
 export interface CoverageSummary {
   total: number
   covered: number
   uncovered: number
   unknown: number
   coverage_rate: number
-  sections: SectionCoverage[]
+  sections?: SectionCoverage[]
 }
 
-/** 回指到声明原文单元的一条指令（轻量引用：状态 + 人话标题；明细看 coverage.sections）。 */
+/** 回指到声明原文单元的一条指令（对应 pydantic TextUnitInstruction；轻量引用：状态 + 人话标题，明细看 coverage.sections）。 */
 export interface TextUnitInstruction {
   instruction_text: string
   headline?: string
   status: "covered" | "uncovered" | "unknown"
 }
 
-/** 声明原文的一个文本单元（声明原文覆盖图的一行；对应 pydantic TextCoverageUnit）。 */
+/** 声明原文的一个文本单元（对应 pydantic TextCoverageUnit；声明原文覆盖图的一行）。 */
 export interface TextCoverageUnit {
   kind: "heading" | "bullet" | "paragraph" | "codeblock"
   /** 单元在 skill_body 里的字符区间（诊断用；渲染以 text 为准——JS 按区间切片有 UTF-16 代理对偏移风险）。 */
@@ -156,41 +194,8 @@ export interface TextCoverageSummary {
   unmodeled: number
   coverage_rate: number
   modeled_ratio: number
-  /** 抽出来了但没落回任何文本单元的指令（如类别级参考），诚实计数。 */
   unmapped_instructions?: string[]
   units: TextCoverageUnit[]
-}
-
-/** 一个 skill 一次 audit 的完整报告（对应 pydantic AuditReport）。 */
-export interface AuditReport {
-  skill_name: string
-  transcripts: string[]
-  transcript_sources?: string[]
-  /** {total, pass, fail, na, unresolved, indeterminate}。 */
-  summary: {
-    total: number
-    pass: number
-    fail: number
-    na: number
-    unresolved?: number
-    indeterminate?: number
-  }
-  findings: AuditFinding[]
-  by_instruction?: InstructionAggregate[]
-  coverage?: CoverageSummary
-  /** 声明文本覆盖视图（对账结果投影回声明原文；旧报告无此字段不显示）。 */
-  text_coverage?: TextCoverageSummary
-  /** 对账时刻的声明正文快照（文本覆盖视图渲染对账时版本；旧报告无此字段）。 */
-  skill_body?: string
-  warnings?: string[]
-  /** refine（LLM 精筛伪指令）砍掉的条数。 */
-  refine_dropped_count?: number
-  /** 本次 audit 所有 LLM 判定调用的 token 用量合计（input/output/cache/cost/calls）。 */
-  token_usage?: Record<string, number>
-  /** audit 墙钟（秒）；stage_breakdown 各阶段秒数之和 ≈ 此值。 */
-  duration_seconds?: number
-  /** 各阶段耗时 + token，诊断慢在哪；refine/headline calls=0 时 note 标缓存命中/未启用。 */
-  stage_breakdown?: StageBreakdownRow[]
 }
 
 /** root 对账组合声明的层信息：随 NDJSON result 事件回传（report 之外），供 finding 分层徽章匹配。 */
@@ -205,5 +210,40 @@ export interface AuditLayerInfo {
   content: string
 }
 
-/** store 侧物化的 result：report + 可选原始 HTML（逃生口用）+ 可选分层声明（root 拼接）。 */
-export type SkillAuditStoredResult = AuditReport & { _html?: string; _layers?: AuditLayerInfo[] }
+/** run 级对账的成员归因：transcript 文件名 → 成员（finding.transcript 反查深链用）。 */
+export interface AuditMemberRef {
+  taskId: string
+  label: string | null
+  framework?: string | null
+}
+
+export type AuditMemberMap = Record<string, AuditMemberRef>
+
+/** sift `--run` 的审计单元：一个被对账的切片/会话 → run 成员与命中的原生调用 id。 */
+export interface AuditRunUnit {
+  auditUnitId: string
+  memberId: string
+  sessionId: string
+  source: string
+  scope: "session" | "agent-segment" | "invocation"
+  matchedToolUseIds: string[]
+}
+
+/** sift `--run` 随报告回填的 run 溯元数据（run.py build_run_report_metadata）。 */
+export interface AuditRunMeta {
+  runId: string
+  bundlePath: string
+  matchedSessionCount: number
+  targetCallCount: number
+  auditUnitCount: number
+  units: AuditRunUnit[]
+  warnings?: string[]
+}
+
+/** store 侧物化的 result：report + 可选原始 HTML（逃生口用）+ 可选分层声明（root 拼接）
+ * + run 级对账的成员映射（transcript 文件名 → 成员）。 */
+export type SkillAuditStoredResult = AuditReport & {
+  _html?: string
+  _layers?: AuditLayerInfo[]
+  _members?: AuditMemberMap
+}

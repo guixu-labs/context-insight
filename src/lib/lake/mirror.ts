@@ -20,9 +20,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { defaultLakeRemote, escapeRegExp, normalizeDirPrefix, redactRemoteSecrets, stripUrlCreds } from './remote';
 import type { LakeRemote, PushAuth } from './remote';
-import { BUNDLE_ROOT_DIR, BUNDLE_MANIFEST_FILE, BUNDLE_META_FILE } from './bundle-layout';
+import { BUNDLE_MANIFEST_FILE, BUNDLE_REPORT_FILE, BUNDLE_META_FILE } from './bundle-layout';
 import { privateLfsBinDir, ensureLfsBinaryAvailable } from './lfs-setup';
-import { readEnvelopeWithLegacy } from '../shared/envelope';
+import { readEnvelope } from '../shared/envelope';
 import { isProxyVersion } from '../shared/session-format';
 // 相对导入纪律：mirror.ts 的导入图会被 tmp/ 下的 tsx 子进程脚本直接引
 // （lake-mirror-init IT 等）——子进程入口不在 tsconfig include 内，@/ 别名
@@ -386,13 +386,44 @@ export function parseSessionFolder(folder: string): { sid: string; recording: Re
  *  压缩——裸 .jsonl 不是管道产物）或 subagents/ 子目录——viewer 的范式
  *  目标文件 <paradigm>/<paradigm>.jsonl（明文追加式）与语料目录散置 jsonl
  *  都不是根级会话，目录保持范式身份。顶层散文件（无目录）不识别。 */
-function resolveSessionPath(p: string): { folder: string; root: string; baseline: boolean; dirPath: string } | null {
+// ── bundle 锚定目录（统一布局：目录即目录，按数据加载）──────────────────
+// 任意目录直接含 workflow.json 即 bundle（锚定规则与会话的「压缩态/meta
+// 锚定」同构）——<范式>/<runId>/、根级 <runId>/、历史专区 opsbot-bundle/
+// <runId>/ 与更深嵌套目录（手工放置）统一识别，零数据迁移。会话与 bundle
+// 同为目录资产：同目录并存，上传/加载两侧均不按资产类型分区。
+
+/** 全树文件清单 → bundle 锚定目录集合（目录直接含 workflow.json）。 */
+function bundleAnchorsOf(files: string[]): Set<string> {
+  const out = new Set<string>();
+  for (const f of files) {
+    const slash = f.lastIndexOf('/');
+    if (slash <= 0) continue; // 顶层散置 workflow.json 无归属目录，忽略
+    if (f.slice(slash + 1) === BUNDLE_MANIFEST_FILE) out.add(f.slice(0, slash));
+  }
+  return out;
+}
+
+/** 文件路径 → 最近的 bundle 锚定祖先目录（不含则 null）。最深优先：嵌套
+ *  锚定目录（理论形态）归最内层。 */
+function bundleOwnerOf(p: string, anchors: Set<string>): string | null {
   const slash = p.lastIndexOf('/');
   if (slash < 0) return null;
   const segs = p.slice(0, slash).split('/');
-  // bundle 专区（opsbot-bundle/<runId>/…）不是会话布局：成员会话只归 bundle，
-  // 不进会话列表/定位视野（设计 lake-bundle R5）
-  if (segs[0] === BUNDLE_ROOT_DIR) return null;
+  for (let i = segs.length; i >= 1; i--) {
+    const cand = segs.slice(0, i).join('/');
+    if (anchors.has(cand)) return cand;
+  }
+  return null;
+}
+
+function resolveSessionPath(p: string, bundleAnchors?: Set<string>): { folder: string; root: string; baseline: boolean; dirPath: string } | null {
+  const slash = p.lastIndexOf('/');
+  if (slash < 0) return null;
+  const segs = p.slice(0, slash).split('/');
+  // bundle 目录内部（任意含 workflow.json 的目录，统一布局）不是会话布局：
+  // 成员会话只归 bundle，不进会话列表/定位视野（历史专区由锚定规则同构
+  // 覆盖，无需专区特判）
+  if (bundleAnchors && bundleOwnerOf(p, bundleAnchors) != null) return null;
   let fi = segs.length - 1;
   if (segs[fi] === 'subagents') {
     if (fi === 0) return null;
@@ -502,14 +533,17 @@ function readSessionMetas(dir: string, remote: LakeRemote): Map<string, { framew
     // 双目录形态（同 sid 双记录）：裸 <sid>/<sid>.meta.json（捕获/主位）与
     // <sid>.native/<sid>.meta.json（原生——目录带后缀、文件用真实 sid）。
     // 键 = 目录名（folder），与 listSessionsIn 的 fileCount/sidLoc 对齐；
-    // 路径归属经 resolveSessionPath（任意深度——嵌套 directory 下同形态可寻）
+    // 路径归属经 resolveSessionPath（任意深度——嵌套 directory 下同形态可寻）；
+    // bundle 目录内部 meta 排除（统一布局后 bundle 可在任意范式目录，成员
+    // meta 不遮蔽同名真实会话）
+    const anchors = bundleAnchorsOf(treeOut.split('\0').map(r => splitLsTreeEntry(r)?.path ?? '').filter(Boolean));
     const wanted: Array<{ folder: string; oid: string }> = [];
     for (const rec of treeOut.split('\0')) {
       const entry = splitLsTreeEntry(rec);
       if (!entry) continue;
       const oidMatch = entry.meta.match(/^[0-9]+\s+blob\s+([0-9a-f]+)$/);
       if (!oidMatch) continue;
-      const loc = resolveSessionPath(entry.path);
+      const loc = resolveSessionPath(entry.path, anchors);
       if (!loc) continue;
       const fileName = entry.path.slice(entry.path.lastIndexOf('/') + 1);
       // 裸形态文件名 = 目录名；.native 形态文件名 = 去后缀真实 sid，补回后缀才是目录名（map 键）
@@ -542,7 +576,7 @@ function readSessionMetas(dir: string, remote: LakeRemote): Map<string, { framew
       const body = text(headerEnd + 1, headerEnd + 1 + size);
       offset = headerEnd + 1 + size + 1; // content + 结尾空行
       try {
-        const d = readEnvelopeWithLegacy(JSON.parse(body))?.data;
+        const d = readEnvelope(JSON.parse(body))?.data;
         out.set(w.folder, {
           framework: typeof d?.framework === 'string' ? d.framework : null,
           ccVersion: typeof d?.ccVersion === 'string' ? d.ccVersion : null,
@@ -574,10 +608,11 @@ function listSessionsIn(dir: string, remote: LakeRemote): LakeSessionEntry[] {
   // ——一级范式 <paradigm>/<sid>/、根级 <sid>/（缺省上传位）、嵌套自定义
   // directory <dir>/<sub>/<sid>/ 统一识别；baseline 段紧邻会话目录前计 baseline 位
   const treeFiles = lsTreeFiles(dir, '', remote);
+  const bundleAnchors = bundleAnchorsOf(treeFiles);
   const fileCount = new Map<string, number>();
   const sidLoc = new Map<string, SessionLocation>();
   for (const line of treeFiles) {
-    const loc = resolveSessionPath(line);
+    const loc = resolveSessionPath(line, bundleAnchors);
     if (!loc) continue;
     fileCount.set(loc.folder, (fileCount.get(loc.folder) ?? 0) + 1);
     const prev = sidLoc.get(loc.folder);
@@ -610,7 +645,7 @@ function listSessionsIn(dir: string, remote: LakeRemote): LakeSessionEntry[] {
       // 归属 = 最后一条上传/维护提交，覆盖重传仍更新描述
       if (subject.startsWith('notes(viewer):')) continue;
       for (const file of lines.slice(1)) {
-        const loc = resolveSessionPath(file);
+        const loc = resolveSessionPath(file, bundleAnchors);
         if (loc && !sidCommit.has(loc.folder)) sidCommit.set(loc.folder, { author, time, subject });
       }
     }
@@ -697,8 +732,11 @@ function locateSessionLocations(dir: string, remote: LakeRemote, sid: string, re
   // 逐项匹配（不 join('\n')/split('\n')）：ls-tree -z 路径可含 \n（NUL 才是
   // 分隔符），按行拆会让恶意文件路径伪造出 `evil-root/<sid>/` 形态的"行"
   // ——完全可控的 root 进入 locs 后直通下游 shell 命令（sparse/add/show）
-  // bundle 专区同理排除（runId 恰与 sid 同形时的防误定位）
-  const files = lsTreeFiles(dir, '', remote).filter(f => !f.startsWith(`${BUNDLE_ROOT_DIR}/`));
+  // bundle 目录内部排除（统一布局：任意锚定目录；runId 恰与 sid 同形时的
+  // 防误定位——历史专区特判泛化为全仓锚定排除）
+  const allFiles = lsTreeFiles(dir, '', remote);
+  const anchors = bundleAnchorsOf(allFiles);
+  const files = allFiles.filter(f => bundleOwnerOf(f, anchors) == null);
   const re = new RegExp(`^([^/]+)\\/(baseline\\/)?${escapeRegExp(folder)}\\/`);
   const locs = new Map<string, SessionLocation>();
   for (const f of files) {
@@ -774,7 +812,7 @@ function bareDirHoldsNativeRecording(dir: string, remote: LakeRemote, loc: Sessi
     const r = spawnGitAuthed(['show', `origin/${remote.branch}:${metaPath}`], dir, remote.pullAuth, 60_000,
       { maxBuffer: 8 * 1024 * 1024 });
     if (r.error || r.status !== 0) return false;
-    const data = readEnvelopeWithLegacy(JSON.parse(r.stdout.toString('utf8')))?.data;
+    const data = readEnvelope(JSON.parse(r.stdout.toString('utf8')))?.data;
     if (data == null || typeof data !== 'object') return false;
     if (data.producer === 'cpx') return false;
     if (typeof data.framework === 'string' && data.framework.endsWith('-proxy')) return false;
@@ -866,27 +904,9 @@ export function materializeSession(sid: string, remote: LakeRemote = defaultLake
   if (!revParseMain(dir, remote)) throw new Error('lake mirror has no main branch');
   if (!/^[\w.-]+$/.test(sid)) throw new Error(`Invalid session id: "${sid}"`);
 
-  // LFS 模式：.jsonl.7z/.jsonl.gz 仓内是指针 blob，cat-file 须带 --filters 让 smudge
-  // 按需拉取 LFS 实体（本地 .git/lfs/objects 缓存，重复导入零下载）。
-  // --filters 的属性解析读工作树 .gitattributes——读路径镜像默认无 checkout，
-  // 需从 origin/main 物化一份（上传路径的 sparse 流程本就含 /.gitattributes）。
-  // 判定对齐 ensureLfsGitattributes（缺 *.gz filter=lfs 声明即刷新，不是仅看
-  // 文件存在）：同一镜像默认模式上传会把剔除过 lfs 行的 .gitattributes 写回
-  // 工作树（LFS 免疫操作），此后远端切回 LFS 模式时过期副本会让 --filters
-  // 不做 smudge——指针文本被当作 gzip 内容落盘，导入在解压环节报费解错误
-  if (remote.lfs) {
-    ensureLfsReady(dir);
-    const gaPath = path.join(dir, '.gitattributes');
-    let gaCur = '';
-    try { gaCur = fs.readFileSync(gaPath, 'utf8'); } catch { /* 无文件 */ }
-    // 判定对齐 ensureLfsGitattributes（*.7z 新形态 + *.gz 存量，缺任一即刷新）
-    const gaStale = !/^\*\.7z\s+filter=lfs/m.test(gaCur) || !/^\*\.gz\s+filter=lfs/m.test(gaCur);
-    if (gaStale) {
-      try {
-        fs.writeFileSync(gaPath, runGitWithAuth(`git show origin/${remote.branch}:.gitattributes`, dir, remote.pullAuth));
-      } catch { /* 仓内无 .gitattributes → 无 lfs 声明，不可能存在指针件 */ }
-    }
-  }
+  // LFS 模式：fail-fast git-lfs 检查 + 工作树 .gitattributes 刷新（与
+  // materializeBundle 共用，见 prepareLfsReadPath）
+  if (remote.lfs) prepareLfsReadPath(dir, remote);
 
   const locs = locateSessionLocations(dir, remote, sid, recording);
   if (locs.length === 0) throw new Error(`Session folder not found in lake: "${sid}"`);
@@ -1047,14 +1067,39 @@ export async function ensureLfsReadyWithBootstrap(dir: string): Promise<void> {
   ensureLfsReady(dir);
 }
 
-/** 导入/物化路径 LFS 就绪（带自举）：materializeSession 是同步函数无法内嵌
- *  自举，由调用方（importLakeSession）在物化前先行——数据仓导入与上传
- *  同享「零手工安装」；就绪检查本体仍在 materializeSession 内（fail-fast）。 */
+/** 导入/物化路径 LFS 就绪（带自举）：materializeSession / materializeBundle
+ *  是同步函数无法内嵌自举，由调用方（importLakeSession / importLakeBundle）
+ *  在物化前先行——数据仓导入与上传同享「零手工安装」；fail-fast 就绪检查
+ *  本体仍在物化函数内（prepareLfsReadPath → ensureLfsReady）。 */
 export async function ensureLfsBootstrapForRead(): Promise<void> {
   ensurePrivateLfsOnPath();
   if (!hasGitLfs()) {
     await ensureLfsBinaryAvailable();
     ensurePrivateLfsOnPath();
+  }
+}
+
+/** 读路径（物化）LFS 就绪：materializeSession / materializeBundle 共用。
+ *  .jsonl.7z/.jsonl.gz 在 LFS 仓内是指针 blob，cat-file 须带 --filters 让
+ *  smudge 按需拉取 LFS 实体（本地 .git/lfs/objects 缓存，重复导入零下载）。
+ *  ① fail-fast：git-lfs 缺失时给出可操作指引，而不是把 git 原文
+ *     （"git-lfs filter-process: git-lfs: not found"）抛给用户；
+ *  ② --filters 的属性解析读工作树 .gitattributes——读路径镜像默认无
+ *     checkout，需从 origin/main 物化一份。判定对齐 ensureLfsGitattributes
+ *     （*.7z 新形态 + *.gz 存量，缺任一即刷新，不是仅看文件存在）：同一
+ *     镜像默认模式上传会把剔除过 lfs 行的 .gitattributes 写回工作树（LFS
+ *     免疫操作），此后远端切回 LFS 模式时过期副本会让 --filters 不做
+ *     smudge——指针文本被当作压缩内容落盘，导入在解压环节报费解错误。 */
+function prepareLfsReadPath(dir: string, remote: LakeRemote): void {
+  ensureLfsReady(dir);
+  const gaPath = path.join(dir, '.gitattributes');
+  let gaCur = '';
+  try { gaCur = fs.readFileSync(gaPath, 'utf8'); } catch { /* 无文件 */ }
+  const gaStale = !/^\*\.7z\s+filter=lfs/m.test(gaCur) || !/^\*\.gz\s+filter=lfs/m.test(gaCur);
+  if (gaStale) {
+    try {
+      fs.writeFileSync(gaPath, runGitWithAuth(`git show origin/${remote.branch}:.gitattributes`, dir, remote.pullAuth));
+    } catch { /* 仓内无 .gitattributes → 无 lfs 声明，不可能存在指针件 */ }
   }
 }
 
@@ -1475,7 +1520,7 @@ function releaseInitLock(lock: string): void {
   } catch { /* best-effort */ }
 }
 
-// ensure 并发去重（single-flight）+ fetch TTL：ensureMirrorAsync 在每个 API 路径上（runs/notes/
+// ensure 单飞 + fetch TTL：ensureMirrorAsync 在每个 API 路径上（runs/notes/
 // health 2s 轮询），不做节流会把每次筛选/轮询变成一次平台往返，并发调用
 // 还会在同一 cacheDir 上踩 ref 锁。TTL 内的镜像视为新鲜，直接复用。
 const FETCH_TTL_MS = 15_000;
@@ -1613,15 +1658,16 @@ interface SessionMeta {
 
 // 双目录形态（同 sid 双记录）：裸 <sid>/<sid>.meta.json（捕获/主位）与
 // <sid>.native/<sid>.meta.json（原生——目录带后缀、文件用真实 sid）。
-// 路径归属经 resolveSessionPath（任意深度——嵌套 directory 下同形态可寻）
-function wantedMetaEntries(treeOut: string): Array<{ folder: string; oid: string }> {
+// 路径归属经 resolveSessionPath（任意深度——嵌套 directory 下同形态可寻）；
+// bundleAnchors = bundle 锚定目录集合（成员 meta 不进清单，防 folder 键遮蔽）
+function wantedMetaEntries(treeOut: string, bundleAnchors: Set<string>): Array<{ folder: string; oid: string }> {
   const wanted: Array<{ folder: string; oid: string }> = [];
   for (const rec of treeOut.split('\0')) {
     const entry = splitLsTreeEntry(rec);
     if (!entry) continue;
     const oidMatch = entry.meta.match(/^[0-9]+\s+blob\s+([0-9a-f]+)$/);
     if (!oidMatch) continue;
-    const loc = resolveSessionPath(entry.path);
+    const loc = resolveSessionPath(entry.path, bundleAnchors);
     if (!loc) continue;
     const fileName = entry.path.slice(entry.path.lastIndexOf('/') + 1);
     // 裸形态文件名 = 目录名；.native 形态文件名 = 去后缀真实 sid，补回后缀才是目录名（map 键）
@@ -1647,7 +1693,7 @@ function parseSessionMetas(buf: Buffer, wanted: Array<{ folder: string; oid: str
     const body = text(headerEnd + 1, headerEnd + 1 + size);
     offset = headerEnd + 1 + size + 1;
     try {
-      const d = readEnvelopeWithLegacy(JSON.parse(body))?.data;
+      const d = readEnvelope(JSON.parse(body))?.data;
       out.set(w.folder, {
         framework: typeof d?.framework === 'string' ? d.framework : null,
         ccVersion: typeof d?.ccVersion === 'string' ? d.ccVersion : null,
@@ -1679,7 +1725,7 @@ async function readSessionMetasDetailed(dir: string, remote: LakeRemote): Promis
     // 同语义；多根（范式）模式全树
     const spec = '';
     const treeOut = runGit(`git ls-tree -r -z origin/${remote.branch}${spec}`, dir).toString('utf8');
-    const wanted = wantedMetaEntries(treeOut);
+    const wanted = wantedMetaEntries(treeOut, bundleAnchorsOf(treeOut.split('\0').map(r => splitLsTreeEntry(r)?.path ?? '').filter(Boolean)));
     if (wanted.length === 0) return new Map();
     // 缺失 meta blob 批量预取：懒取是逐对象一次协商，冷镜像千级缺失时批量读
     // 会被 120s 超时截断、指标列残缺（实测 2370 缺失懒取 ≈42min vs 批量
@@ -1724,10 +1770,11 @@ export async function readLakeSessions(dir: string, remote: LakeRemote): Promise
   if (!mainRev) { markLakePhase('idle'); return []; }
 
   const treeFiles = lsTreeFiles(dir, '', remote);
+  const bundleAnchors = bundleAnchorsOf(treeFiles);
   const fileCount = new Map<string, number>();
   const sidLoc = new Map<string, { root: string; baseline: boolean; dirPath: string }>();
   for (const line of treeFiles) {
-    const loc = resolveSessionPath(line);
+    const loc = resolveSessionPath(line, bundleAnchors);
     if (loc) {
       // folder 是目录名——同 sid 双记录下裸目录与 .native 是两个目录，各自
       // 一条目；真实 sid 由 parseSessionFolder 剥后缀还原
@@ -1762,7 +1809,7 @@ export async function readLakeSessions(dir: string, remote: LakeRemote): Promise
       const subject = sep < 0 ? '' : lines[0].slice(sep + 1);
       if (subject.startsWith('notes(viewer):')) continue;
       for (const file of lines.slice(1)) {
-        const loc = resolveSessionPath(file);
+        const loc = resolveSessionPath(file, bundleAnchors);
         if (loc) sidCommit.set(loc.dirPath, { time, subject });
       }
     }
@@ -1815,25 +1862,31 @@ export function readParadigmDirs(dir: string, remote: LakeRemote): string[] {
   return lsTreeTopDirs(dir, remote).sort();
 }
 
-// ── bundle 对象（opsbot-bundle/<runId>/，设计 lake-bundle）───────────
+// ── bundle 对象（<范式>/<runId>/，统一布局；设计 lake-bundle）──────────
 // 与会话对象共用 runGit/ensureMirror/pushMirror/withWriteLock 原语；语义差异
-// （无 baseline/记录类/范式位）不进会话函数——各自独立函数，互不触碰。
+// （无 baseline/记录类概念）不进会话函数——各自独立函数，互不触碰。
 
 export interface LakeBundleEntry {
   runId: string;
   name: string | null;
+  status: string | null;
   exportDataComplete: boolean | null;
   memberCount: number | null;
   sessionCount: number | null;
   submitter: string | null;
   description: string | null;
   remark: string | null;
+  /** 所在顶层目录（统一布局：位置即身份，由 bundle 目录路径首段推导，与
+   *  会话列表范式同源；根级 bundle 无目录前缀 = null） */
+  paradigm: string | null;
+  /** 任务结果标注（cc-bundle-meta 可选字段 opGen），无则 null = 未标注 */
+  opGen: 'success' | 'failure' | null;
   uploadedAt: string | null;
   fileCount: number;
   commitTime: string;
 }
 
-// manifest 成员计数（递归含嵌套子 workflow）
+// manifest 成员计数（递归含嵌套子 workflow；report.totals 缺失时的回落源）
 function countBundleMembers(data: { members?: unknown[] }): number {
   let n = 0;
   for (const m of data.members ?? []) {
@@ -1846,55 +1899,52 @@ function countBundleMembers(data: { members?: unknown[] }): number {
   return n;
 }
 
-/** bundle 列表：锚定目录扫描（含 workflow.json 即 bundle）+ 两个 JSON blob
- *  读取（manifest/meta）+ 一次 log walk 取 commitTime。 */
+/** bundle 列表（统一布局：全树锚定扫描）：任意含 workflow.json 的目录即
+ *  bundle——<范式>/<runId>/、根级 <runId>/、历史专区 opsbot-bundle/<runId>/
+ *  同构识别（零数据迁移）。条目 paradigm = 所在顶层目录（位置即身份，与会
+ *  话同款；根级为 null）。blob 三读（manifest/report/meta）+ 一次 log walk
+ *  取 commitTime。 */
 export function listBundles(remote: LakeRemote = defaultLakeRemote()): LakeBundleEntry[] {
   const dir = ensureMirror(remote);
   if (!revParseMain(dir, remote)) return [];
-  const files = lsTreeFiles(dir, ` -- ${BUNDLE_ROOT_DIR}/`, remote);
-  if (files.length === 0) return [];
-
-  // runId → { 锚定 blob、其余文件清单 }；锚定 = <runId>/workflow.json
-  const perRun = new Map<string, { anchored: boolean; files: string[]; blobOids: Map<string, string> }>();
-  const treeOut = runGit(`git ls-tree -r -z origin/${remote.branch} -- ${BUNDLE_ROOT_DIR}/`, dir).toString('utf8');
-  for (const rec of treeOut.split('\0')) {
-    const entry = splitLsTreeEntry(rec);
-    if (!entry) continue;
+  const treeOut = runGit(`git ls-tree -r -z origin/${remote.branch}`, dir).toString('utf8');
+  const records = treeOut.split('\0').map(r => {
+    const entry = splitLsTreeEntry(r);
+    if (!entry) return null;
     const m = entry.meta.match(/^(\d+)\s+(\w+)\s+([0-9a-f]+)$/);
-    if (!m || m[2] !== 'blob') continue;
-    const rel = entry.path.slice(`${BUNDLE_ROOT_DIR}/`.length);
-    const slash = rel.indexOf('/');
-    if (slash <= 0) continue; // 顶层散文件忽略（无 runId 归属）
-    const runId = rel.slice(0, slash);
-    const file = rel.slice(slash + 1);
-    let item = perRun.get(runId);
-    if (!item) { item = { anchored: false, files: [], blobOids: new Map() }; perRun.set(runId, item); }
+    if (!m || m[2] !== 'blob') return null;
+    return { oid: m[3], path: entry.path };
+  }).filter((e): e is { oid: string; path: string } => e != null);
+  const anchors = bundleAnchorsOf(records.map(r => r.path));
+  if (anchors.size === 0) return [];
+
+  // bundle 目录 → 文件清单 + blob oid（归属 = 最近锚定祖先目录）
+  const perBundle = new Map<string, { files: string[]; blobOids: Map<string, string> }>();
+  for (const rec of records) {
+    const owner = bundleOwnerOf(rec.path, anchors);
+    if (!owner) continue;
+    let item = perBundle.get(owner);
+    if (!item) { item = { files: [], blobOids: new Map() }; perBundle.set(owner, item); }
+    const file = rec.path.slice(owner.length + 1);
     item.files.push(file);
-    item.blobOids.set(file, m[3]);
-    if (file === BUNDLE_MANIFEST_FILE) item.anchored = true;
+    item.blobOids.set(file, rec.oid);
   }
 
-  // commitTime：一次 log walk，runId 前缀首命中（新→旧）即最新上传
+  // commitTime：一次 log walk，bundle 目录前缀首命中（新→旧）即最新上传
   const runCommit = new Map<string, { time: string; subject: string }>();
   try {
     const logOut = runGitText(
       `git -c core.quotepath=off log --pretty=format:%x00%aI%x1f%s --name-only origin/${remote.branch}`,
       dir,
     );
-    const prefixOf = (f: string): string | null => {
-      if (!f.startsWith(`${BUNDLE_ROOT_DIR}/`)) return null;
-      const rest = f.slice(`${BUNDLE_ROOT_DIR}/`.length);
-      const slash = rest.indexOf('/');
-      return slash > 0 ? rest.slice(0, slash) : null;
-    };
     for (const record of logOut.split('\x00')) {
       const lines = record.split('\n').filter(l => l.trim());
       if (lines.length === 0) continue;
       const sep = lines[0].indexOf('\x1f');
       if (sep < 0) continue;
       for (const file of lines.slice(1)) {
-        const runId = prefixOf(file);
-        if (runId && !runCommit.has(runId)) runCommit.set(runId, { time: lines[0].slice(0, sep), subject: lines[0].slice(sep + 1) });
+        const owner = bundleOwnerOf(file, anchors);
+        if (owner && !runCommit.has(owner)) runCommit.set(owner, { time: lines[0].slice(0, sep), subject: lines[0].slice(sep + 1) });
       }
     }
   } catch { /* 无历史时 commitTime 退化空串 */ }
@@ -1905,44 +1955,74 @@ export function listBundles(remote: LakeRemote = defaultLakeRemote()): LakeBundl
   };
 
   const entries: LakeBundleEntry[] = [];
-  for (const [runId, item] of perRun) {
-    if (!item.anchored) continue;
-    const manifest = item.blobOids.has(BUNDLE_MANIFEST_FILE) ? readJson(item.blobOids.get(BUNDLE_MANIFEST_FILE)!) : null;
+  for (const [bundleDir, item] of perBundle) {
+    if (!item.blobOids.has(BUNDLE_MANIFEST_FILE)) continue;
+    const runId = bundleDir.slice(bundleDir.lastIndexOf('/') + 1);
+    const manifest = readJson(item.blobOids.get(BUNDLE_MANIFEST_FILE)!);
+    const report = item.blobOids.has(BUNDLE_REPORT_FILE) ? readJson(item.blobOids.get(BUNDLE_REPORT_FILE)!) : null;
     const meta = item.blobOids.has(BUNDLE_META_FILE) ? readJson(item.blobOids.get(BUNDLE_META_FILE)!) : null;
-    const metaData = readEnvelopeWithLegacy(meta)?.schema === 'cc-bundle-meta' ? (readEnvelopeWithLegacy(meta)!.data as Record<string, unknown> | undefined) : undefined;
+    const metaData = readEnvelope(meta)?.schema === 'cc-bundle-meta' ? (readEnvelope(meta)!.data as Record<string, unknown> | undefined) : undefined;
     const data = (manifest?.data ?? {}) as { members?: unknown[]; exportDataComplete?: unknown };
-    // sessionCount 权威源 = 仓内 sessions/ 一级目录数
+    const totals = (report?.totals ?? null) as { members?: number; session_files?: number } | null;
+    // sessionCount 权威源 = 仓内 sessions/ 一级目录数（不依赖 report 存在）
     const sessionDirs = new Set(item.files
       .filter(f => f.startsWith('sessions/') && f.indexOf('/', 'sessions/'.length) > 0)
       .map(f => f.slice('sessions/'.length, f.indexOf('/', 'sessions/'.length))));
     entries.push({
       runId,
       name: typeof manifest?.name === 'string' ? manifest.name : null,
+      status: typeof report?.status === 'string' ? report.status : null,
       exportDataComplete: manifest ? data.exportDataComplete === true : null,
-      memberCount: manifest ? countBundleMembers(data) : null,
-      sessionCount: sessionDirs.size || null,
+      memberCount: totals?.members ?? (manifest ? countBundleMembers(data) : null),
+      sessionCount: sessionDirs.size || totals?.session_files || null,
       submitter: typeof metaData?.submitter === 'string' ? metaData.submitter : null,
       description: typeof metaData?.description === 'string' ? metaData.description : null,
       remark: typeof metaData?.remark === 'string' ? metaData.remark : null,
+      // 范式 = 所在顶层目录（位置即身份，与会话列表同源；根级 bundle 无范式）
+      paradigm: bundleDir.includes('/') ? bundleDir.slice(0, bundleDir.indexOf('/')) : null,
+      opGen: metaData?.opGen === 'success' || metaData?.opGen === 'failure' ? metaData.opGen : null,
       uploadedAt: typeof metaData?.uploadedAt === 'string' ? metaData.uploadedAt : null,
       fileCount: item.files.length,
-      commitTime: runCommit.get(runId)?.time ?? '',
+      commitTime: runCommit.get(bundleDir)?.time ?? '',
     });
   }
   entries.sort((a, b) => (b.commitTime || '').localeCompare(a.commitTime || ''));
   return entries;
 }
 
-/** bundle 物化（只读路径，不触碰镜像工作树）：ls-tree 前缀 + blob 批量预取
+/** runId 现存 bundle 位置（全仓锚定搜索）：runId 全仓唯一约定（与会话
+ *  「sid × 记录类 全仓唯一」对齐），换目录重传由上传侧原子迁移维护。 */
+function locateBundleDirs(dir: string, remote: LakeRemote, runId: string): string[] {
+  const anchors = bundleAnchorsOf(lsTreeFiles(dir, '', remote));
+  return [...anchors].filter(a => a === runId || a.endsWith(`/${runId}`)).sort();
+}
+
+/** bundle 物化（只读路径，不触碰镜像工作树；LFS 模式除外——工作树
+ *  .gitattributes 刷新，见 prepareLfsReadPath）：ls-tree 前缀 + blob 批量预取
  *  + cat-file --batch 分批写盘（与 materializeSession 同构；LFS 模式指针件
- *  逐文件 --filters smudge）。压缩态原样物化（解压归编排层）。 */
-export function materializeBundle(runId: string, targetDir: string, remote: LakeRemote = defaultLakeRemote()): string {
+ *  逐文件 --filters smudge）。压缩态原样物化（解压归编排层）。
+ *  统一布局定位：paradigm 给定（''=根级）→ 精确目录；缺省 → runId 全仓
+ *  锚定搜索——唯一即用，多处同名 = 数据卫生问题，报错列位置交用户清理。 */
+export function materializeBundle(runId: string, targetDir: string, remote: LakeRemote = defaultLakeRemote(), paradigm?: string): string {
   const t0 = Date.now();
   if (!/^[\w.-]+$/.test(runId)) throw new Error(`Invalid bundle id: "${runId}"`);
-  lakeLog.info('bundle materialize start', { runId });
+  if (paradigm != null && !/^[\w.-]+$/.test(paradigm)) throw new Error(`Invalid paradigm dir: "${paradigm}"`);
+  lakeLog.info('bundle materialize start', { runId, paradigm: paradigm ?? '' });
   const dir = ensureMirror(remote);
   if (!revParseMain(dir, remote)) throw new Error('lake mirror has no main branch');
-  const prefix = `${BUNDLE_ROOT_DIR}/${runId}/`;
+  let prefix: string;
+  if (paradigm != null) {
+    const cand = paradigm ? `${paradigm}/${runId}` : runId;
+    if (!locateBundleDirs(dir, remote, runId).includes(cand)) {
+      throw new Error(`Bundle not found in lake: "${runId}"（${paradigm ? `目录 ${paradigm}` : '根目录'}）`);
+    }
+    prefix = `${cand}/`;
+  } else {
+    const hits = locateBundleDirs(dir, remote, runId);
+    if (hits.length === 0) throw new Error(`Bundle not found in lake: "${runId}"`);
+    if (hits.length > 1) throw new Error(`Bundle "${runId}" 存在于多个目录（${hits.join('、')}）——runId 全仓唯一，请先在数据仓清理重复位置后重试`);
+    prefix = `${hits[0]}/`;
+  }
   const treeOut = runGit(`git ls-tree -r -z origin/${remote.branch} -- ${prefix}`, dir).toString('utf8');
   const entries: Array<{ oid: string; repoPath: string }> = [];
   for (const rec of treeOut.split('\0')) {
@@ -1959,6 +2039,10 @@ export function materializeBundle(runId: string, targetDir: string, remote: Lake
   fs.rmSync(targetDir, { recursive: true, force: true });
   fs.mkdirSync(targetDir, { recursive: true });
   if (remote.lfs) {
+    // 与 materializeSession 同款读路径就绪：fail-fast git-lfs 检查 + 工作树
+    // .gitattributes 刷新（此前缺失——git-lfs 缺失时 git 原文直抛，过期
+    // 副本则让 smudge 静默失效、指针文本被当 7z 落盘）
+    prepareLfsReadPath(dir, remote);
     for (const e of entries) {
       const target = path.join(targetDir, e.repoPath.slice(prefix.length));
       fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -1983,23 +2067,31 @@ export function materializeBundle(runId: string, targetDir: string, remote: Lake
   return targetDir;
 }
 
-/** bundle 上传：narrow sparse 物化专区目录 + scoped add + commit + push
- *  （与 uploadFolder 同构管道；无 baseline/记录类/范式位概念）。staging 布局
- *  stagingDir/<runId>/ = 权威全集，目标整体替换（原子语义）。 */
+/** bundle 上传（统一布局：目标 <category>/<runId>/，缺省根级 <runId>/——与
+ *  会话 uploadFolder 同款落点语义）：narrow sparse 物化目标目录 + scoped
+ *  add + commit + push（同构管道；无 baseline/记录类概念）。staging 布局
+ *  stagingDir/<runId>/ = 权威全集，目标整体替换（原子语义）。runId 全仓
+ *  唯一：其它目录的同名 bundle 作为过期位置一并删除——换目录上传 = 原子
+ *  迁移（同 commit 完成，与会话换范式迁移同款）。 */
 export async function uploadBundleFolder(
-  stagingDir: string, runId: string, commitMessage: string, remote: LakeRemote = defaultLakeRemote(),
+  stagingDir: string, runId: string, commitMessage: string, remote: LakeRemote = defaultLakeRemote(), category?: string,
 ): Promise<UploadResult> {
   const t0 = Date.now();
-  lakeLog.info('bundle upload start', { runId });
+  lakeLog.info('bundle upload start', { runId, category: category ?? '' });
   return withWriteLock(async () => {
     if (!/^[\w.-]+$/.test(runId)) throw new Error(`Invalid bundle id: "${runId}"`);
+    if (category != null && !/^[\w.-]+$/.test(category)) throw new Error(`Invalid paradigm dir: "${category}"`);
+    const targetRoot = category ?? remote.rootDir;
+    const tp = targetRoot ? `${targetRoot}/` : '';
+    const targetRel = `${tp}${runId}`;
     const dir = ensureMirror(remote);
     if (!revParseMain(dir, remote)) throw new Error('lake mirror has no main branch');
     if (remote.lfs) await ensureLfsReadyWithBootstrap(dir);
-    const targetRel = `${BUNDLE_ROOT_DIR}/${runId}`;
+    // 同 runId 其它目录位置（原子迁移：同 commit 删旧+落新，维持全仓唯一）
+    const staleDirs = locateBundleDirs(dir, remote, runId).filter(d => d !== targetRel);
 
     runGit('git sparse-checkout init --no-cone', dir);
-    runGit(`git sparse-checkout set "/${targetRel}/**" "/.gitattributes"`, dir);
+    runGit(`git sparse-checkout set "/${targetRel}/**"${staleDirs.map(d => ` "/${d}/**"`).join('')} "/.gitattributes"`, dir);
     try {
       runGit(`git checkout -B ${remote.branch} origin/${remote.branch}`, dir);
     } catch {
@@ -2010,7 +2102,9 @@ export async function uploadBundleFolder(
     }
     runGit('git reset --quiet', dir);
 
-    fs.rmSync(path.join(dir, ...targetRel.split('/')), { recursive: true, force: true });
+    for (const d of [targetRel, ...staleDirs]) {
+      fs.rmSync(path.join(dir, ...d.split('/')), { recursive: true, force: true });
+    }
     fs.mkdirSync(path.join(dir, ...targetRel.split('/')), { recursive: true });
     fs.cpSync(path.join(stagingDir, runId), path.join(dir, ...targetRel.split('/')), { recursive: true });
 
@@ -2028,7 +2122,7 @@ export async function uploadBundleFolder(
       }
     }
 
-    runGit(`git add ${targetRel}`, dir, 120_000, remote.lfs ? { raw: true } : undefined);
+    runGit(`git add ${[targetRel, ...staleDirs].join(' ')}`, dir, 120_000, remote.lfs ? { raw: true } : undefined);
     const msgFile = path.join(dir, '_commit_msg.txt');
     fs.writeFileSync(msgFile, commitMessage);
     let unchanged = false;
@@ -2055,7 +2149,7 @@ export async function uploadBundleFolder(
         push();
       }
     }
-    lakeLog.info('bundle upload done', { runId, unchanged, ms: Date.now() - t0 });
+    lakeLog.info('bundle upload done', { runId, category: category ?? '', migratedFrom: staleDirs.join(','), unchanged, ms: Date.now() - t0 });
     return { folder: `${targetRel}/`, unchanged, gitattributesFixed };
   });
 }

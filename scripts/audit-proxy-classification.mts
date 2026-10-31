@@ -33,7 +33,12 @@ async function main() {
   const sessions = Array.from(byTask.values());
   const bad: string[] = [];
   for (const s of sessions) {
-    const cls = fs.existsSync(s.sourcePath) ? classifyProxyCapture(s.sourcePath) : null;
+    // 并行测试的物化源可能恰好被其属主清理（TOCTOU）——读失败视同文件
+    // 缺失（不可核验），不中断整场审计
+    let cls: ReturnType<typeof classifyProxyCapture> = null;
+    if (fs.existsSync(s.sourcePath)) {
+      try { cls = classifyProxyCapture(s.sourcePath); } catch { /* 源中途消失 */ }
+    }
     const marker = cls?.isProxy ? cls.marker : null;
     // 方案一（同 sid 双会话）：proxy 行的 framework 带 -proxy 记录后缀
     // （claude-code-proxy / opencode-proxy / …），期望值与导入侧同构

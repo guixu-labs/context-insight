@@ -13,7 +13,7 @@
 // subagent——统一收敛到本模块。
 // 编号只服务同名消歧：唯一名（如 codex 每代理唯一 nickname）不编号——
 // "Volta #1" 的 #1 是纯噪音；同名组（claude 多个 general/Explore）才 1..N。
-// 消费方（TurnTimeline/ContextTracker/详情页/Replay）均有缺号回退分支，
+// 消费方（会话块泳道/ContextTracker/详情页/Replay）均有缺号回退分支，
 // map 中无该组条目 = 显示裸名。
 
 export interface SubagentNumberingTurn {
