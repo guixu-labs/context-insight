@@ -112,7 +112,3 @@ test-report/
 
 # CLI bundle (npm prepack artifact, esbuild → dist/cli.mjs)
 dist/
-
-# brand variant pack staging (pack-cannbot.mjs; keep out of npm artifacts)
-.context-pack/
-.cannbot-pack/

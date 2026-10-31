@@ -24,17 +24,17 @@ python -m pytest tests/ -v
 # 起服务（默认 21026 端口）
 python server.py
 # 或指定端口
-CANNBOT_AGENT_PORT=21027 python server.py
+CONTEXT_AGENT_PORT=21027 python server.py
 
 # 离线分析单文件
-CANNBOT_LLM_API_KEY=sk-xxx python analyze.py /path/to/log1.md --model qwen3.7-max
+CONTEXT_LLM_API_KEY=sk-xxx python analyze.py /path/to/log1.md --model qwen3.7-max
 ```
 
 ## 与前端联动
 
 Next.js 代理路由 `/api/ai/audit-session-py` 会把当前 session 的 MD 文本 POST 到 `http://localhost:21026/analyze`。Audit tab 的 v1/v2 开关切换走 TS 版（v1）或 Python 版（v2）。
 
-环境变量 `CANNBOT_AGENT_URL` 可覆盖代理目标（默认 `http://localhost:21026`）。
+环境变量 `CONTEXT_AGENT_URL` 可覆盖代理目标（默认 `http://localhost:21026`）。
 
 ## API
 
@@ -44,7 +44,7 @@ body: {trajectoryText, provider:{baseUrl,apiKey,model}, promptMd?, outputDir?, o
 → 200 {outputPath, rounds, analysis}
 → 400/500 {error}
 
-GET /health → {status: ok, service: cannbot-smart-agent}
+GET /health → {status: ok, service: context-smart-agent}
 ```
 
 ## 与 TS 版的差异

@@ -58,7 +58,7 @@ export interface NodeInstance {
   executionState: 'executed' | 'not_run' | 'carried';
   carriedFromGeneration: number | null;
   attempts: AttemptRecord[];
-  /** attempt=0 且 executionState=pending 的空占位成员 */
+  /** attempt=0 且 executionState 非 carried 的空占位成员（「本代尚未运行」） */
   pendingMembers: SessionMemberRef[];
   retryPolicy: RunGraphAnnotation['retryPolicy'] | null;
   runOnFailure: boolean | null;
@@ -175,8 +175,8 @@ interface Group {
 export function buildViewModel(index: RunIndex): RunViewModel {
   const warnings = [...index.warnings];
 
-  // 导出侧未提供 graph 定位字段：图/代际/重试视图
-  // 整体不可用——显式告知而非留一张空画布；导入不拒绝，会话级观测照常
+  // 导出包未提供 graph 定位字段：图/代际/重试视图整体不可用——显式告知
+  // 而非留一张空画布；导入不拒绝，会话级观测照常
   if (index.graphMembers.length === 0) {
     warnings.push('导出包未包含 graph 节点定位字段，依赖图与代际/重试视图不可用；成员会话信息仍可查看');
   }
@@ -199,11 +199,13 @@ export function buildViewModel(index: RunIndex): RunViewModel {
   // 2. 子图挂接表：gen-sub-graph 关系按「子图 workflow 成员 id + 生成器代数」
   //    指向生成器节点实例（原型 subgraphParentByGeneration）。subgraphGeneratorsOf
   //    反查「子图容器 → 生成器实例」：真实导出件（d01dfbaa）存在「目标 depends_on
-  //    生成器产出的子图」形态——依赖源是子图 workflow 容器成员（无 graph 注解），
-  //    需归约到生成器节点实例才能进入图视图。
+  //    生成器产出的子图」形态——依赖源是子图 workflow 容器成员，需归约到生成器
+  //    节点实例才能进入图视图（新格式容器自带定位字段时由下方补行直挂）。
   const generatorNodeIds = new Set<string>();
   const subgraphParentByGeneration = new Map<string, string>();
   const subgraphGeneratorsOf = new Map<string, string[]>();
+  // 新格式下子图容器（workflow 成员）自带图定位字段，直接作为图节点分组；
+  // 挂接表补一行「容器成员 → 自身分组」，使子图节点在图视图中可达。
   for (const m of index.graphMembers) {
     if (m.member.kind === 'workflow') {
       subgraphParentByGeneration.set(`${m.member.id}|${m.graph!.generation}`, memberGroup.get(m.member.id)!);
@@ -236,7 +238,7 @@ export function buildViewModel(index: RunIndex): RunViewModel {
     }
   }
   if (droppedDeps > 0) {
-    warnings.push(`${droppedDeps} 条 depends_on 关系的端点无 graph 注解，未进入图视图`);
+    warnings.push(`${droppedDeps} 条 depends_on 关系的端点无 graph 定位，未进入图视图`);
   }
 
   // 3. 同代依赖来源表（原型 dependencySources；跨代边也保留，视图层归约）。

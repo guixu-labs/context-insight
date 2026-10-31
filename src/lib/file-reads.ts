@@ -22,6 +22,8 @@ export interface ReadEntry {
   subagentSessionId: string | null;
   llmOutput: string | null;
   range: ReadRange;
+  /** 读取发生的成员会话归因（run 合并视图；session 不带 → 行为零变化） */
+  member?: { taskId: string; label: string | null } | null;
 }
 
 export function isDirectoryRead(filePath: string, resultJson: string | null): boolean {

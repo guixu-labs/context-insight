@@ -35,12 +35,6 @@ const GIT_LFS_SHA256: Record<string, string> = {
   'darwin-arm64': 'caff76a7d070d8160c89bc39b6e85d98f24135b6fed038a3b4de2590d25102d8',
 };
 const DEFAULT_BASE = 'https://github.com/git-lfs/git-lfs/releases/download';
-// 内置公共镜像回退链（仅 GitHub 直连失败时逐个尝试；可达性实测筛选——
-// ghproxy.net 慢、hub.gitmirror.com 失联、gh-proxy.net 返回占位页，均不入链）
-const MIRROR_BASES = [
-  'https://gh-proxy.com/https://github.com/git-lfs/git-lfs/releases/download',
-  'https://ghfast.top/https://github.com/git-lfs/git-lfs/releases/download',
-];
 
 export function platformKey(): string {
   const p = process.platform;
@@ -61,6 +55,13 @@ export function lfsDownloadUrl(key: string, baseUrl?: string): string {
   const base = (baseUrl ?? process.env.CONTEXT_CPX_LFS_BASE ?? DEFAULT_BASE).replace(/\/+$/, '');
   return `${base}/v${GIT_LFS_VERSION}/${lfsAssetName(key)}`;
 }
+
+// 内置公共镜像回退链（仅 GitHub 直连失败时逐个尝试；可达性实测筛选——
+// ghproxy.net 慢、hub.gitmirror.com 失联、gh-proxy.net 返回占位页，均不入链）
+const MIRROR_BASES = [
+  'https://gh-proxy.com/https://github.com/git-lfs/git-lfs/releases/download',
+  'https://ghfast.top/https://github.com/git-lfs/git-lfs/releases/download',
+];
 
 /** 下载源回退链（有序）：显式镜像/env 覆写 = 单源（用户意图优先，不再
  *  叠加内置源）；缺省 = GitHub 直连 → 内置公共镜像。 */
@@ -89,22 +90,6 @@ export function privateLfsBinDir(): string {
   return path.join(path.dirname(process.env.CONTEXT_PROXY_DIR ?? path.join(os.homedir(), '.context-insight', 'proxy')), 'bin');
 }
 
-export function lfsBinaryPath(): string {
-  return path.join(privateLfsBinDir(), 'git-lfs');
-}
-
-/** 私有件健康检查（直接执行 `<path> version`）。 */
-export function privateGitLfsOk(): boolean {
-  const p = lfsBinaryPath();
-  try {
-    const st = fs.statSync(p);
-    if (!st.isFile()) return false;
-    return spawnSync(p, ['version'], { stdio: 'pipe', timeout: 10_000 }).status === 0;
-  } catch {
-    return false;
-  }
-}
-
 /** 可执行件版本号（`git-lfs/3.8.0 (...)` → "3.8.0"）；不可执行/无版本输出 → null */
 function gitLfsVersionOf(bin: string): string | null {
   try {
@@ -124,9 +109,25 @@ function legacyLfsBinCandidates(): string[] {
   return BRAND_LEGACY_CONFIG_DIRS.map(d => path.join(os.homedir(), d, 'bin', 'git-lfs'));
 }
 
+export function lfsBinaryPath(): string {
+  return path.join(privateLfsBinDir(), 'git-lfs');
+}
+
+/** 私有件健康检查（直接执行 `<path> version`）。 */
+export function privateGitLfsOk(): boolean {
+  const p = lfsBinaryPath();
+  try {
+    const st = fs.statSync(p);
+    if (!st.isFile()) return false;
+    return spawnSync(p, ['version'], { stdio: 'pipe', timeout: 10_000 }).status === 0;
+  } catch {
+    return false;
+  }
+}
+
 export function lfsSetupGuidance(reason: string): string {
   return `LFS 模式需要 git-lfs，自动获取失败（${reason}；已依次尝试 GitHub 直连与公共镜像回退）。出路：
-  1. 配置可达镜像后重试上传（将自动重试自举）：CONTEXT_CPX_LFS_BASE=<镜像基址>（按 git-lfs releases/download 路径结构镜像，如 https://gh-proxy.com/https://github.com/git-lfs/git-lfs/releases/download）
+  1. 配置可达镜像后重试上传/导入（将自动重试自举）：CONTEXT_CPX_LFS_BASE=<镜像基址>（按 git-lfs releases/download 路径结构镜像，如 https://gh-proxy.com/https://github.com/git-lfs/git-lfs/releases/download）
   2. 系统安装 git-lfs 并确保在 PATH：https://git-lfs.github.com（apt install git-lfs / brew install git-lfs）
   3. 关闭 LFS 走普通 git 存储：LAKE_LFS=0（受 git 仓容量配额钳制）`;
 }
@@ -198,6 +199,7 @@ async function downloadAndInstall(url: string, key: string, deps: LfsSetupDeps, 
     extractArchive(path.join(staging, lfsAssetName(key)), ex);
     const bin = findBinary(ex);
     if (!bin) throw new Error('归档中未找到 git-lfs 可执行件');
+
     installFromBinary(bin);
     log(`git-lfs 私有件就绪 → ${lfsBinaryPath()}`);
   } finally {
@@ -239,10 +241,10 @@ async function runLfsBootstrap(deps: LfsSetupDeps): Promise<void> {
   throw new Error(lfsSetupGuidance(`全部下载源失败（${failures.join('；')}）`));
 }
 
-/** 确保 git-lfs 私有件可用：已就绪（私有件在位）→ 跳过；旧代产物可复用 →
- *  拷贝；否则按下载源回退链自动下载（sha256 校验）安装到
- *  ~/.context-insight/bin。全部失败抛指引错误（上传路径据此拒绝，捕获保留
- *  本地）。系统件的解析由镜像侧 PATH 前置完成（系统件优先于私有件）。 */
+/** 确保 git-lfs 私有件可用：已就绪（私有件在位）→ 跳过；否则按下载源回退链
+ *  自动下载（sha256 校验）安装到 ~/.context-insight/bin。全部失败抛指引错误
+ *  （上传路径据此拒绝，捕获保留本地）。系统件的解析由镜像侧 PATH 前置
+ *  完成（系统件优先于私有件）。 */
 export async function ensureLfsBinaryAvailable(deps: LfsSetupDeps = {}): Promise<void> {
   if (privateGitLfsOk()) return;
   if (!lfsBootstrapInflight) {

@@ -19,7 +19,7 @@
 
 const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '0.0.0.0', '[::1]', '::1']);
 
-const API_PATH_PREFIXES = ['/api/', '/lake_viewer/api/'];
+const API_PATH_PREFIXES = ['/api/'];
 
 export type OriginGuardDecision =
   | { allow: true }

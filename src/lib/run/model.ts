@@ -7,7 +7,7 @@
 // See LICENSE in the root of the software repository for the full text of the License.
 
 // Run 域领域类型（workflow-bundle manifest 的内部模型）。
-// 契约源头：随包分发的 workflow-bundle v1 schema。
+// 契约源头：随包分发的 workflow.schema.json（结构权威，导入时哈希校验）。
 // 信封冻结原则（对齐 lake-schema-spec）：(schema, version) 声明式分发；
 // 未知字段一律透传（索引签名），加可选字段不升版，改语义必升版。
 
@@ -19,14 +19,15 @@ export const BUNDLE_VERSION = 1 as const;
  * （run/import-service）共用这一实现，避免两处硬编码静默分叉。 */
 export const MANIFEST_FILENAMES = ['workflow.json', 'manifest.json'] as const;
 
-/** bundle 随包的权威 JSON Schema（draft-07）文件名，与 workflow.json 并列。
- * 导入时用它做结构校验（避免 insight 手写校验与 opsbot 漂移），缺文件即拒绝。 */
+/** 随包结构权威文件名：导入时哈希校验后用于 workflow.json 结构校验，
+ * 落盘 run 目录随上传进数据仓。 */
 export const WORKFLOW_SCHEMA_FILE = 'workflow.schema.json' as const;
 
 export type MemberKind = 'process' | 'session' | 'workflow';
 export type MemberRole = 'execute' | 'verify';
 
-/** 供图视图使用的投影：graph 字段在 member 顶层，role 在 annotation。 */
+/** 供图视图使用的投影：graph 定位字段在 member 顶层，role 在自由 annotation。
+ * 这里只收观测需要的稳定字段，其余透传。 */
 export interface RunGraphAnnotation {
   nodeId: string;
   generation: number;          // 回滚代，0 起
@@ -50,6 +51,7 @@ export interface RunMember {
   sessionId?: string | null;   // session 成员指向会话正文（源身份，非 DB 行 id）
   location?: string | null;    // 会话目录相对包根的 POSIX 路径
   output?: { text?: string } | null;
+  // 图定位字段（新格式位于 member 顶层；旧格式经 reader 归一回这里）
   nodeId?: string;
   generation?: number;
   attempt?: number;
@@ -67,6 +69,8 @@ export interface RunMember {
 export interface RunRelation {
   from: string;                // 成员 id（可跨层级）
   to: string;
+  /** 关系类型（新格式位于 relation.type）：depends_on/rollback/gen-sub-graph；
+   * handoff 为单会话 Run 的交接关系（可导入，图视图不消费）。 */
   type?: 'depends_on' | 'rollback' | 'gen-sub-graph' | 'handoff';
   annotation?: { note?: string } & Record<string, unknown>;
   [k: string]: unknown;
@@ -120,6 +124,16 @@ export interface SessionRef {
   /** 上下文峰值水位（0-100）：该会话全部 turn 的 contextWindowPct 最大值。
    *  可选——旧响应/测试 fixture 可缺省，消费方按无数据处理。 */
   contextPeakPct?: number | null;
+  /** 会话行模型 / 成本（统一工作台 run 行 Σ 指标用；可选同 contextPeakPct
+   *  先例——旧 fixture 缺省按无数据处理） */
+  model?: string | null;
+  totalCost?: number | null;
+  /** 会话行版本（run 行活跃拆分取数用：isProxyVersion 决定时间轴展开规则） */
+  version?: string | null;
+  /** 会话源文件路径（run 页刷新/自动同步能力判定：无源不可增量刷新） */
+  sourcePath?: string | null;
+  /** 会话行 Σlatency（run 汇总时长口径：墙钟缺端点时回落，同 sessionAggregates） */
+  totalLatencyMs?: number | null;
   /** 评分卡规则层融合（第六刀）：会话内行为质量的确定性评分——D4 效率/D5
    *  冗余的规则子项加权分（子集归一，非整卡维度分），findings 只保留异常
    *  信号（满分项不占版面）。可选——缺省按无评分数据处理。 */
