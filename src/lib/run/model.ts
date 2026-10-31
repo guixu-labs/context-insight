@@ -121,18 +121,6 @@ export interface SessionRef {
   startTime: string | null;    // 会话起止（ISO）：成员 manifest 常缺时间戳，展示层用会话行起止兜底
   endTime: string | null;
   cacheReadTokens: number | null; // 指标透镜（缓存命中占比）
-  /** 会话行累计成本（run 行 Cost 汇总的唯一值源）。可选——旧响应/测试
-   *  fixture 可缺省，消费方按 0 处理。 */
-  totalCost?: number | null;
-  /** 会话行主模型原始值（展示前经 displayModel 归一；run 行模型分布的值源）。
-   *  可选——缺省不计入分布。 */
-  model?: string | null;
-  /** Σ turn latency（endTime 缺端点时的墙钟回落值，sessionDurationMs 消费）。
-   *  可选——缺省按无兜底处理。 */
-  totalLatencyMs?: number | null;
-  /** 记录类判定值（isProxyVersion 识别 proxy 行 → getActiveSplitMap 活跃
-   *  窗口展开口径）。可选——缺省按非 proxy 处理。 */
-  version?: string | null;
   /** 上下文峰值水位（0-100）：该会话全部 turn 的 contextWindowPct 最大值。
    *  可选——旧响应/测试 fixture 可缺省，消费方按无数据处理。 */
   contextPeakPct?: number | null;
