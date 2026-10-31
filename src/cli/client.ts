@@ -30,8 +30,8 @@ import type {
   ApiRunDetailResponse,
   ApiRunMembership,
 } from './types';
+import { soloRunIdOf } from '@/lib/run/identity';
 import fs from 'node:fs';
-import path from 'node:path';
 
 export interface ClientConfig {
   baseUrl: string;
@@ -135,7 +135,9 @@ export class InsightClient {
   }
 
   async getSession(taskId: string): Promise<ApiSessionDetailResponse> {
-    return this.request<ApiSessionDetailResponse>('GET', '/api/observe/session', { taskId });
+    // run-first 刀J：session 端点退役——按 taskId 的会话详情走其 solo run 的
+    // 成员视图（member-detail 转发，响应形状与原 session 详情逐字段一致）
+    return this.request<ApiSessionDetailResponse>('GET', `/api/observe/run/${encodeURIComponent(soloRunIdOf(taskId))}/member-detail`);
   }
 
   async getStats(taskId?: string): Promise<ApiGlobalStatsResponse | ApiSessionStatsResponse> {
@@ -149,26 +151,28 @@ export class InsightClient {
   }
 
   async getTurns(taskId: string, opts?: { isSubagent?: boolean; role?: string }): Promise<ApiTurnsResponse> {
-    const params: Record<string, string | boolean> = { taskId };
+    // 成员富轮次（run member-turns 转发；taskId/framework 由 scope 成员消歧行注入）
+    const params: Record<string, string | boolean> = {};
     if (opts?.isSubagent !== undefined) params.isSubagent = opts.isSubagent;
     if (opts?.role) params.role = opts.role;
-    return this.request<ApiTurnsResponse>('GET', '/api/observe/session/turns', params);
+    return this.request<ApiTurnsResponse>('GET', `/api/observe/run/${encodeURIComponent(soloRunIdOf(taskId))}/member-turns`, params);
   }
 
   async getTurnDetail(turnId: string): Promise<ApiTurnDetailResponse> {
-    return this.request<ApiTurnDetailResponse>('GET', `/api/observe/session/turns/${turnId}`);
+    // turnId 全局唯一：顶级 turn 详情（session/turns/[turnId] 的刀J 迁移位）
+    return this.request<ApiTurnDetailResponse>('GET', `/api/observe/turn/${encodeURIComponent(turnId)}`);
   }
 
   async searchTurns(taskId: string, keyword: string): Promise<ApiSearchResponse> {
-    return this.request<ApiSearchResponse>('GET', '/api/observe/session/turns/search', { taskId, keyword });
+    return this.request<ApiSearchResponse>('GET', `/api/observe/run/${encodeURIComponent(soloRunIdOf(taskId))}/turns/search`, { keyword });
   }
 
   async getWorkflow(taskId: string): Promise<WorkflowTree> {
-    return this.request<WorkflowTree>('GET', '/api/observe/session/workflow', { taskId });
+    return this.request<WorkflowTree>('GET', `/api/observe/run/${encodeURIComponent(soloRunIdOf(taskId))}/workflow`);
   }
 
   async getBridges(taskId: string): Promise<ApiBridgesResponse> {
-    return this.request<ApiBridgesResponse>('GET', '/api/observe/session/bridges', { taskId });
+    return this.request<ApiBridgesResponse>('GET', `/api/observe/run/${encodeURIComponent(soloRunIdOf(taskId))}/bridges`);
   }
 
   async importSession(source: string, filePath: string, sessionId: string): Promise<ApiImportResponse> {
@@ -306,9 +310,9 @@ export class InsightClient {
 
   // Exports a session to Markdown. Same code path as the web UI's "Export Markdown"
   // button and the audit pipeline's first step (exportSessionToMarkdown), so the
-  // output is byte-identical to /api/observe/session/export-md.
+  // output is byte-identical to the run member-view export-md endpoint.
   async exportSessionMarkdown(taskId: string, outputPath: string, framework?: string): Promise<{ size: number }> {
-    const url = new URL('/api/observe/session/export-md', this.config.baseUrl);
+    const url = new URL(`/api/observe/run/${encodeURIComponent(soloRunIdOf(taskId))}/export-md`, this.config.baseUrl);
     url.searchParams.set('taskId', taskId);
     if (framework) url.searchParams.set('framework', framework);
 

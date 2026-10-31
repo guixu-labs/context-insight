@@ -61,6 +61,8 @@ const DEFAULT_CONTEXT_WINDOWS: Record<string, number> = {
   "mistral-medium": 32768,
 };
 
+// 未知模型兜底 1M：GLM-5 系等新一代模型普遍 1M 上下文，旧 200k 兜底会
+// 把上下文水位普遍高估成濒满（饼图/水位条失真）
 const FALLBACK_DEFAULT = 1000000;
 
 interface ContextWindowConfig {

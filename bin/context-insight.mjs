@@ -26,7 +26,7 @@ const __dirname = path.dirname(__filename)
 const PKG_DIR = path.resolve(__dirname, '..')
 const require = createRequire(PKG_DIR + '/')
 
-// 数据目录迁移：cannbot 时代（≤0.2.40）的 ~/.cannbot-insight 首启原子改名到
+// 数据目录迁移：cannbot 时代（≤0.2.39）的 ~/.cannbot-insight 首启原子改名到
 // ~/.context-insight。仅当「旧在、新不在」时执行；显式 CONTEXT_INSIGHT_HOME
 // 覆盖 = 用户自管目录，不掺和；两目录并存 = 沿用新目录并提示（不合并）。
 const LEGACY_DATA_DIR = path.join(homedir(), '.cannbot-insight')
@@ -221,7 +221,7 @@ async function startWebUi(rawArgs) {
   const dbPath = path.join(DATA_DIR, 'insight.db')
   const distDir = path.join(PKG_DIR, '.next')
   // 历史清理：旧版启动器曾把绝对 distDir 传给 Next，被拼成包目录深处的垃圾路径
-  // （如 <PKG>/home/<user>/.cannbot-insight/.next），一次性回收
+  // （如 <PKG>/home/<user>/.context-insight/.next），一次性回收
   const legacyJunk = path.join(PKG_DIR, DATA_DIR, '.next')
   if (legacyJunk !== distDir) rmSync(legacyJunk, { recursive: true, force: true })
   process.env.DATABASE_URL = `file:${dbPath}`
