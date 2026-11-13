@@ -10,6 +10,7 @@
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { fallbackAgentDisplayName } from "@/components/observe/agent-display-name"
 import { reminderPrefix } from "./LlmContextView"
 
 interface ToolCallEntry {
@@ -251,7 +252,9 @@ function ContextSection({ info, prevPct }: { info: ContextInfo; prevPct: number 
         {/* Agent header */}
         <div className="flex items-center gap-2 mb-2">
           <Badge variant={info.isSubagent ? "orange" : "blue"}>
-            {info.isSubagent ? `🤖 ${info.subagentName ?? "subagent"}` : "🤖 root"}
+            {info.isSubagent
+              ? `🤖 ${info.subagentName ?? "Subagent"}`
+              : `🤖 ${fallbackAgentDisplayName({ isSubagent: false, agentName: info.agentName })}`}
           </Badge>
           {info.model && (
             <span className="text-xs text-muted-foreground truncate max-w-[160px]">{info.model}</span>

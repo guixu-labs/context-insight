@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { buildRunActors, subagentBaseNameOf, type RunActor } from "@/components/observe/run-actor"
+import { fallbackAgentDisplayName, mainAgentDisplayName } from "@/components/observe/agent-display-name"
 import type { TurnRowItem } from "@/components/observe/ContextTracker"
 import { contextAgentKeyOf, contextColorMapOf, contextLegendKeyOf } from "@/components/observe/context-legend"
 import {
@@ -83,7 +84,7 @@ function computeTimelines(turns: TurnRowItem[], stepOf: Map<string, number>): Ag
       if (!seen.has(sid)) {
         seen.set(sid, {
           sessionId: sid,
-          agentName: t.agentName ?? "?",
+          agentName: fallbackAgentDisplayName({ isSubagent: t.isSubagent, agentName: t.agentName }),
           isRoot: !t.isSubagent,
           subagentType: t.isSubagent ? t.subagentType ?? null : null,
         })
@@ -96,8 +97,12 @@ function computeTimelines(turns: TurnRowItem[], stepOf: Map<string, number>): Ag
   const timelines: AgentTimeline[] = []
 
   for (const [sid, agentTurns] of sessionMap) {
-    const agentName = agentTurns[0].agentName ?? "?"
     const isRoot = !agentTurns[0].isSubagent
+    const agentName = fallbackAgentDisplayName({
+      isSubagent: !isRoot,
+      memberLabel: agentTurns[0].member?.label,
+      agentName: agentTurns[0].agentName,
+    })
     const memberLabel = agentTurns[0].member?.label ?? null
     const subagentType = isRoot ? null : agentTurns[0].subagentType ?? null
     const color = colorMap.get(contextLegendKeyOf({ sessionId: sid, agentName, isRoot, subagentType })) ?? "#94a3b8"
@@ -124,7 +129,19 @@ function computeTimelines(turns: TurnRowItem[], stepOf: Map<string, number>): Ag
 function displayLabel(s: AgentTimeline, actors: Map<string, RunActor>): string {
   // 命名单一源（run-actor）：道名与趋势卡/图例同源；目录缺项兜底
   return actors.get(s.sessionId)?.displayName
-    ?? (s.isRoot ? s.memberLabel ?? s.agentName : subagentBaseNameOf(s))
+    ?? (s.isRoot
+      ? mainAgentDisplayName({ memberLabel: s.memberLabel, agentName: s.agentName })
+      : subagentBaseNameOf(s))
+}
+
+function turnDisplayLabel(t: TurnRowItem, actors: Map<string, RunActor>): string {
+  const actor = actors.get(contextAgentKeyOf(t));
+  if (actor) return actor.displayName;
+  return fallbackAgentDisplayName({
+    isSubagent: t.isSubagent,
+    memberLabel: t.member?.label,
+    agentName: t.isSubagent ? (t.subagentType ?? t.agentName) : t.agentName,
+  });
 }
 
 interface ContextReplayDialogProps {
@@ -561,14 +578,14 @@ function ContextReplayPlayer({
             <span className="font-medium">Turn #{currentTurn}</span>
             {currentTurnData.map(t => (
               <Badge key={t.turnId} variant={t.isSubagent ? "orange" : "blue"} className="text-xs">
-                {t.isSubagent ? (t.subagentType ?? t.agentName ?? "sub") : (t.agentName ?? "root")}
+                {turnDisplayLabel(t, actors)}
               </Badge>
             ))}
           </div>
           <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
             {currentTurnData.map(t => (
               <span key={t.turnId}>
-                {t.isSubagent ? (t.subagentType ?? t.agentName ?? "?") : (t.agentName ?? "?")}: {formatTokenCount(t.inputTokens)} input
+                {turnDisplayLabel(t, actors)}: {formatTokenCount(t.inputTokens)} input
                 {t.contextWindowPct != null && t.contextWindowPct > 0 && ` (${t.contextWindowPct.toFixed(1)}%)`}
               </span>
             ))}

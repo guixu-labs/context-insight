@@ -40,7 +40,7 @@ export function buildSubagentNumbers(turns: SubagentNumberingTurn[]): Map<string
     const key = subagentGroupKey(t)
     if (groups.has(key)) continue
     groups.set(key, {
-      agentName: t.subagentType ?? t.agentName ?? "?",
+      agentName: t.subagentType ?? t.agentName ?? "Subagent",
       firstAt: t.createdAt ? new Date(t.createdAt).getTime() : Number.MAX_SAFE_INTEGER,
       order: i,
     })

@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils"
 import { BookOpenIcon } from "lucide-react"
 import { useSkillContent } from "@/components/observe/use-skill-content"
 import type { ViewUrlFor } from "@/lib/observe/member-url"
+import { fallbackAgentDisplayName, mainAgentDisplayName } from "@/components/observe/agent-display-name"
 
 function truncateVisual(str: string, maxWidth: number): string {
   if (stringWidth(str) <= maxWidth) return str
@@ -200,7 +201,7 @@ function SkillsPerAgentChart({ taskId, skillEvents, urlFor }: SkillChartsProps) 
   const data = useMemo(() => {
     const byAgent = new Map<string, Map<string, { calls: number; input: number; output: number; reasoning: number; cacheRead: number }>>()
     for (const se of skillEvents) {
-      const agent = se.agentName ?? (se.isSubagent ? "subagent" : "root")
+      const agent = fallbackAgentDisplayName({ isSubagent: se.isSubagent, agentName: se.agentName })
       if (!byAgent.has(agent)) byAgent.set(agent, new Map())
       const skillMap = byAgent.get(agent)!
       if (!skillMap.has(se.skillName)) skillMap.set(se.skillName, { calls: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0 })
@@ -214,10 +215,10 @@ function SkillsPerAgentChart({ taskId, skillEvents, urlFor }: SkillChartsProps) 
     const relMap = new Map<string, string[]>()
     for (const se of skillEvents) {
       if (se.isSubagent) {
-        const subAgent = se.agentName ?? "subagent"
+        const subAgent = fallbackAgentDisplayName({ isSubagent: true, agentName: se.agentName })
         const rootSe = skillEvents.find(r => !r.isSubagent && r.turnIndex < se.turnIndex)
         if (rootSe) {
-          const root = rootSe.agentName ?? "root"
+          const root = mainAgentDisplayName({ agentName: rootSe.agentName })
           if (root !== subAgent) {
             if (!relMap.has(subAgent)) relMap.set(subAgent, [])
             if (!relMap.get(subAgent)!.includes(root)) relMap.get(subAgent)!.push(root)

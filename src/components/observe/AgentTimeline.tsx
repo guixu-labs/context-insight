@@ -9,6 +9,7 @@
 
 import { useMemo, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { fallbackAgentDisplayName } from "@/components/observe/agent-display-name"
 
 interface AgentItem {
   executionId: string
@@ -156,7 +157,7 @@ export function AgentTimeline({ agents, onViewTurns }: AgentTimelineProps) {
     setTooltip({
       x: rect.left + rect.width / 2,
       y: rect.top,
-      label: agent.agentName ?? (agent.isSubagent ? "subagent" : "root"),
+      label: fallbackAgentDisplayName({ isSubagent: agent.isSubagent, agentName: agent.agentName }),
       tokens: agent.tokens,
       cost: agent.cost,
       latencyMs: agent.latencyMs,
@@ -225,7 +226,7 @@ export function AgentTimeline({ agents, onViewTurns }: AgentTimelineProps) {
             const leftPct = getLeftPct(agent.createdAt)
             const widthPct = getWidthPct(agent.latencyMs)
             const barColor = getBarColor(agent.tokens)
-            const label = agent.agentName ?? (agent.isSubagent ? "subagent" : "root")
+            const label = fallbackAgentDisplayName({ isSubagent: agent.isSubagent, agentName: agent.agentName })
             const isHovered = tooltip?.label === label && tooltip?.startTime === formatTimeAbsolute(agent.createdAt)
 
             return (

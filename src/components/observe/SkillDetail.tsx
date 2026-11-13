@@ -19,6 +19,7 @@ import { SkillCharts } from "@/components/observe/SkillCharts"
 import { SkillCoverageCard } from "@/components/observe/SkillCoverageCard"
 import { SkillContentAudit } from "@/components/observe/SkillContentAudit"
 import { BookOpenIcon } from "lucide-react"
+import { fallbackAgentDisplayName } from "@/components/observe/agent-display-name"
 import { useSkillContent } from "@/components/observe/use-skill-content"
 import {
   Table,
@@ -844,7 +845,7 @@ export function SkillDetail({ taskId, sessionSkills, skillEvents, hasMainAgentWo
                                   "flex items-center gap-2 px-2 py-1.5 border rounded-md text-sm",
                                   se.success ? "bg-emerald-50/30 dark:bg-emerald-500/5" : "bg-red-50/30 dark:bg-red-500/5"
                                 )}>
-                                  <span className="text-xs text-muted-foreground">Turn {onNavigateToTurn ? <button className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer" onClick={(e) => { e.stopPropagation(); onNavigateToTurn(se.turnIndex) }}>{se.turnIndex}</button> : se.turnIndex} · Agent: {se.agentName ?? "root"}{se.isSubagent ? " (sub)" : ""}</span>
+                                  <span className="text-xs text-muted-foreground">Turn {onNavigateToTurn ? <button className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer" onClick={(e) => { e.stopPropagation(); onNavigateToTurn(se.turnIndex) }}>{se.turnIndex}</button> : se.turnIndex} · Agent: {fallbackAgentDisplayName({ isSubagent: se.isSubagent, agentName: se.agentName })}{se.isSubagent ? " (sub)" : ""}</span>
                                   <Badge variant={EVENT_TYPE_BADGE[se.eventType] ?? "gray"}>
                                     {se.eventType}
                                   </Badge>

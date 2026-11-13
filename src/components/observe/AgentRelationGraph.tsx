@@ -11,6 +11,7 @@ import { useMemo, useState, useCallback, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ZoomInIcon, ZoomOutIcon, RotateCcwIcon } from "lucide-react"
+import { fallbackAgentDisplayName } from "@/components/observe/agent-display-name"
 
 interface AgentItem {
   executionId: string
@@ -276,7 +277,7 @@ export function AgentRelationGraph({ agents, bridges, onViewTurns }: AgentRelati
 
     for (const agent of sortedAgents) {
       const depth = computeDepth(agent.executionId)
-      const label = agent.agentName ?? (agent.isSubagent ? "subagent" : "root")
+      const label = fallbackAgentDisplayName({ isSubagent: agent.isSubagent, agentName: agent.agentName })
       const color = getAgentColor(agent.agentName)
       const bridge = agent.isSubagent && agent.agentSessionId
         ? bridgeBySession.get(agent.agentSessionId) ?? null

@@ -18,6 +18,7 @@ import { ContextReplayDialog } from "@/components/observe/ContextReplayDialog"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { isCommandTurn, isContinuationTurn, parseCommandTurns, formatCommandDisplay } from "@/lib/shared/command-parser"
 import { buildRunActors, subagentBaseNameOf, type RunActor } from "@/components/observe/run-actor"
+import { fallbackAgentDisplayName, mainAgentDisplayName } from "@/components/observe/agent-display-name"
 import { contextAgentKeyOf, contextLegendKeyOf, contextColorMapOf } from "@/components/observe/context-legend"
 import { lttb, monotonePath } from "@/components/observe/chart-geometry"
 
@@ -249,7 +250,11 @@ function computeAgentStats(turns: TurnRowItem[], limitOf: (sid: string) => numbe
     const member = agentTurns[0].member ?? null
     const contextLimit = limitOf(sid)
     const subagentType = isRoot ? null : agentTurns[0].subagentType ?? null
-    const agentName = agentTurns[0].agentName ?? (isRoot ? "Main Agent" : "?")
+    const agentName = fallbackAgentDisplayName({
+      isSubagent: !isRoot,
+      memberLabel: member?.label,
+      agentName: agentTurns[0].agentName,
+    })
     const realInput = agentTurns.map(t => t.inputMessagesTokens || t.totalTokens)
     const cacheRead = agentTurns.map(t => t.cacheReadTokens ?? 0)
     const ctxPcts = agentTurns.map(t => t.contextWindowPct ?? 0).filter(p => p > 0)
@@ -369,7 +374,9 @@ export function ContextTracker({ turns, sessionModel, agentContextLimits, onNavi
   const displayLabel = useCallback((s: AgentStats) => {
     return actors.get(s.sessionId)?.displayName
       // 目录缺项兜底（载荷异常保底，理论不可达）
-      ?? (s.isRoot ? s.memberLabel ?? s.agentName : subagentBaseNameOf(s))
+      ?? (s.isRoot
+        ? mainAgentDisplayName({ memberLabel: s.memberLabel, agentName: s.agentName })
+        : subagentBaseNameOf(s))
   }, [actors])
 
   if (agentStats.length === 0) {

@@ -19,6 +19,7 @@ import { resolveSubagentIdentity } from "@/lib/subagent-identity"
 import { resolveLaneKey } from "@/lib/swimlane-lanes"
 import { assignLaneSlots, computeMaxConcurrency } from "@/lib/swimlane-slots"
 import type { AgentItem, BridgeItem } from "./AgentCallGraph"
+import { fallbackAgentDisplayName, mainAgentDisplayName } from "@/components/observe/agent-display-name"
 
 const LANE_LABEL_WIDTH = 109
 const SUB_BAR_H = 12
@@ -342,7 +343,10 @@ export function AgentSwimlaneV2({ agents, bridges, isProxy = false, onViewTurns,
     setTooltip({
       x: rect.left + rect.width / 2,
       y: rect.top,
-      label: id?.subagentType ?? span.agent.agentName ?? (span.agent.isSubagent ? "subagent" : "root"),
+      label: id?.subagentType ?? fallbackAgentDisplayName({
+        isSubagent: span.agent.isSubagent,
+        agentName: span.agent.agentName,
+      }),
       step: steps.length > 0 ? steps.join(" · ") : (id?.step ?? null),
       dispatchCount: span.bridge ? 1 : bs.length,
       firstPrompt: span.agent.firstPrompt,
@@ -566,7 +570,7 @@ export function AgentSwimlaneV2({ agents, bridges, isProxy = false, onViewTurns,
         <div className="flex flex-wrap gap-2 items-center pt-1">
           <div className="flex items-center gap-1.5 text-xs">
             <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#3b82f6" }} />
-            <span className="font-medium text-blue-600 dark:text-blue-400">root</span>
+            <span className="font-medium text-blue-600 dark:text-blue-400">{mainAgentDisplayName({})}</span>
           </div>
           {legendKeys.map(k => {
             const color = colorOf.get(k) ?? "#94a3b8"

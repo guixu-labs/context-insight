@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { fallbackAgentDisplayName, mainAgentDisplayName } from "@/components/observe/agent-display-name"
 
 interface ExecutionItem {
   executionId: string
@@ -230,9 +231,11 @@ export function TimelineGantt({
       <Card>
         <CardContent className="py-3 space-y-2">
           <div className="flex items-center gap-2">
-            <Badge className={cn(color.bar, "text-white")}>{exec.isSubagent ? (exec.subagentName ?? exec.agentName ?? "subagent") : (exec.agentName ?? "root")}</Badge>
+            <Badge className={cn(color.bar, "text-white")}>{exec.isSubagent
+              ? (exec.subagentName ?? fallbackAgentDisplayName({ isSubagent: true, agentName: exec.agentName }))
+              : mainAgentDisplayName({ agentName: exec.agentName })}</Badge>
             {exec.subagentType && <Badge variant="outline">{exec.subagentType}</Badge>}
-            <Badge variant={exec.isSubagent ? "orange" : "blue"}>{exec.isSubagent ? "subagent" : "root"}</Badge>
+            <Badge variant={exec.isSubagent ? "orange" : "blue"}>{exec.isSubagent ? "subagent" : "main"}</Badge>
           </div>
           <div className="grid grid-cols-3 gap-3 text-xs">
             <div>
@@ -281,7 +284,9 @@ export function TimelineGantt({
     const isSelected = selectedId === exec.executionId
     const isHovered = hoveredId === exec.executionId
     const showLabel = barWidth > 8
-    const label = exec.isSubagent ? (exec.subagentName ?? exec.agentName ?? "sub") : (exec.agentName ?? "root")
+    const label = exec.isSubagent
+      ? (exec.subagentName ?? fallbackAgentDisplayName({ isSubagent: true, agentName: exec.agentName }))
+      : mainAgentDisplayName({ agentName: exec.agentName })
 
     return (
       <div
@@ -428,7 +433,7 @@ export function TimelineGantt({
           {rootExec && (
             <div className="mb-3">
               <div className="flex items-center gap-2 mb-1">
-                <Badge variant="blue">{rootExec.agentName ?? "root"}</Badge>
+                <Badge variant="blue">{mainAgentDisplayName({ agentName: rootExec.agentName })}</Badge>
                 <span className="text-xs text-muted-foreground">
                   {formatLatency(rootExec.latencyMs)} | {formatTokenCount(rootExec.tokens)} tok | {formatCost(rootExec.cost)}
                 </span>

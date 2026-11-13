@@ -24,6 +24,7 @@
 //   两种命名群体——派发步骤与类型名不再裸混一列。
 
 import { contextAgentKeyOf, contextLegendKeyOf } from "@/components/observe/context-legend"
+import { fallbackAgentDisplayName } from "@/components/observe/agent-display-name"
 import { buildSubagentNumbers } from "@/lib/subagent-numbering"
 
 export type RunActorKind = "main" | "member" | "subagent"
@@ -84,7 +85,11 @@ export function buildRunActors(turns: RunActorTurn[]): Map<string, RunActor> {
   const actors = new Map<string, RunActor>()
   for (const [key, t] of groups) {
     const isRoot = !t.isSubagent
-    const agentName = t.agentName ?? (isRoot ? "Main Agent" : "?")
+    const agentName = fallbackAgentDisplayName({
+      isSubagent: !isRoot,
+      memberLabel: t.member?.label,
+      agentName: t.agentName,
+    })
     const subagentType = isRoot ? null : t.subagentType ?? null
     const kind: RunActorKind = isRoot ? (t.member ? "member" : "main") : "subagent"
     let baseName: string

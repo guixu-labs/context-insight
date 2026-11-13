@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Fixed
+- 【统一主 Agent 展示名】主 Agent 命名统一为 `member label → agentName → Main Agent`，Context Replay 的顶部泳道、turn badge 和逐 turn 明细改走同一 actor 名称，不再混用 `root / ? / Assistant`；缺失子代理名称统一回落 `Subagent`
 - 【移除 run 状态徽标】solo 会话的 `passed` 是“会话已导入”的合成状态，不代表任务成功；workflow run 顶层状态也与工具错误口径混杂。现 Overview 与首页 run 行不再展示 run 状态徽标，保留 Graph 节点状态、重试状态和 Errors 独立统计
 - 【Codex/OpenAI token 口径与 Turn 环比】Codex/OpenAI 的 `input_tokens` 已包含缓存、`output_tokens` 已包含 reasoning，此前 UI 再相加会在 Turn 详情重复计数（左侧权威 total 11.1k、右侧输入 20.9k/输出 647）。现摄取时统一拆成互不重叠的输入/缓存、输出/推理桶；Turn「较上轮」同步改用输入合计与上一 assistant 轮比较，并移除无业务意义的百分比
 - 【构建重写产物下的运行实例新旧代码混跑】运行中的服务器对 `.next` 被构建重写无感知，此后一直执行启动那一刻的旧代码（数据错乱、零报错、重启即愈——E2E 门禁与手跑 `npm run build` 都会触发）。现 E2E 构建改走独立产物目录 `.next-e2e`；`npm run build` 前自动停掉本仓运行中的实例（构建失效的实例继续跑就是事故源）；服务端启动日志自报版本与构建号——进程跑的是哪个构建，从此可直接对账

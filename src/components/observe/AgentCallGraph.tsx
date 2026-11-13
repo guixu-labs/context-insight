@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/componen
 import { Button } from "@/components/ui/button"
 import { clusterActiveSegments } from "@/lib/active-time"
 import { resolveSubagentIdentity } from "@/lib/subagent-identity"
+import { fallbackAgentDisplayName } from "@/components/observe/agent-display-name"
 
 export interface AgentItem {
   executionId: string
@@ -427,7 +428,10 @@ export function AgentCallGraph({ agents, bridges, isProxy = false, onViewTurns }
     setTooltip({
       x: rect.left + rect.width / 2,
       y: rect.top,
-      label: identityOf(agent)?.subagentType ?? agent.agentName ?? (agent.isSubagent ? "subagent" : "root"),
+      label: identityOf(agent)?.subagentType ?? fallbackAgentDisplayName({
+        isSubagent: agent.isSubagent,
+        agentName: agent.agentName,
+      }),
       firstPrompt: agent.firstPrompt,
       tokens: agent.tokens,
       maxSingleCallTokens: agent.maxSingleCallTokens,
@@ -587,7 +591,10 @@ export function AgentCallGraph({ agents, bridges, isProxy = false, onViewTurns }
         </div>
 
         <div className="flex flex-wrap gap-2 pt-1">
-          {[...new Set(agents.map(a => identityOf(a)?.subagentType ?? a.agentName ?? "root"))].map(name => (
+          {[...new Set(agents.map(a => identityOf(a)?.subagentType ?? fallbackAgentDisplayName({
+            isSubagent: a.isSubagent,
+            agentName: a.agentName,
+          })))].map(name => (
             <div key={name} className="flex items-center gap-1 text-xs">
               <div className="w-3 h-3" style={{ backgroundColor: getAgentColor(name) }} />
               <span className="text-muted-foreground truncate max-w-[120px]">{name}</span>

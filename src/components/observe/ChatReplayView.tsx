@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { isCommandTurn, isCommandCaveat, isCommandStdout, parseCommandTurns, formatCommandDisplay, isContinuationTurn, parseContinuationTurn } from "@/lib/shared/command-parser"
+import { mainAgentDisplayName } from "@/components/observe/agent-display-name"
 
 type ChatReplayTurn = {
   turnId: string
@@ -259,7 +260,7 @@ function groupTurnsIntoMessages(turns: ChatReplayTurn[]): ChatMessage[] {
           panel: "right",
           role: "dispatch",
           content: `→ ${turn.model ?? "LLM"}: forwarding ${formatTokenCount(ctxTokens)} context (${turn.inputMessagesCount} messages)`,
-          agentName: turn.agentName ?? "Assistant",
+          agentName: mainAgentDisplayName({ agentName: turn.agentName }),
           isSubagent: isSub,
           subagentName: turn.subagentName ?? null,
           model: turn.model ?? null,
@@ -278,7 +279,7 @@ function groupTurnsIntoMessages(turns: ChatReplayTurn[]): ChatMessage[] {
           panel: "right",
           role: "dispatch",
           content: `→ continue (${formatTokenCount(ctxTokens)} ctx)`,
-          agentName: turn.agentName ?? "Assistant",
+          agentName: mainAgentDisplayName({ agentName: turn.agentName }),
           isSubagent: isSub,
           subagentName: turn.subagentName ?? null,
           model: turn.model ?? null,
@@ -300,7 +301,7 @@ function groupTurnsIntoMessages(turns: ChatReplayTurn[]): ChatMessage[] {
           panel: "right",
           role: "assistant",
           content: turn.contentSummary ?? turn.content ?? "...",
-          agentName: turn.agentName ?? "Assistant",
+          agentName: mainAgentDisplayName({ agentName: turn.agentName }),
           isSubagent: isSub,
           subagentName: turn.subagentName ?? null,
           model: turn.model ?? null,
@@ -317,7 +318,7 @@ function groupTurnsIntoMessages(turns: ChatReplayTurn[]): ChatMessage[] {
           panel: "right",
           role: "assistant",
           content: "...",
-          agentName: turn.agentName ?? "Assistant",
+          agentName: mainAgentDisplayName({ agentName: turn.agentName }),
           isSubagent: isSub,
           subagentName: turn.subagentName ?? null,
           model: turn.model ?? null,
@@ -337,7 +338,7 @@ function groupTurnsIntoMessages(turns: ChatReplayTurn[]): ChatMessage[] {
           panel: "left",
           role: "tool",
           content: null,
-          agentName: turn.agentName ?? "Assistant",
+          agentName: mainAgentDisplayName({ agentName: turn.agentName }),
           isSubagent: isSub,
           subagentName: turn.subagentName ?? null,
           model: null,
@@ -462,7 +463,7 @@ function LeftPanelBubble({ msg, expanded, onToggleExpand, onNavigate }: {
         </div>
         <div className="max-w-[85%] flex flex-col items-end">
           <span className="text-xs text-muted-foreground">
-            {msg.isSubagent ? `${msg.subagentName ?? "subagent"}` : `${msg.agentName ?? "Assistant"}`} · Tool
+            {msg.isSubagent ? `${msg.subagentName ?? "subagent"}` : `${mainAgentDisplayName({ agentName: msg.agentName })}`} · Tool
           </span>
           <div className="rounded-2xl rounded-br-sm px-3 py-2 text-sm bg-orange-100 dark:bg-orange-900/20 text-foreground cursor-pointer"
             onClick={() => onNavigate(msg.turnId)}>
@@ -498,7 +499,7 @@ function RightPanelBubble({ msg, expanded, onToggleExpand, onNavigate }: {
           style={{ backgroundColor: msg.isSubagent ? "#8b5cf6" : "#f97316" }}>→</div>
         <div className="max-w-[85%]">
           <span className="text-xs text-muted-foreground">
-            {msg.isSubagent ? `${msg.subagentName ?? "subagent"} → LLM` : `${msg.agentName ?? "Assistant"} → LLM`}
+            {msg.isSubagent ? `${msg.subagentName ?? "subagent"} → LLM` : `${mainAgentDisplayName({ agentName: msg.agentName })} → LLM`}
             {msg.model && <span className="ml-1 opacity-60 font-mono">{msg.model}</span>}
           </span>
           <div className="rounded-xl px-2.5 py-1.5 text-xs bg-orange-100 dark:bg-orange-900/20 text-foreground cursor-pointer"
@@ -524,7 +525,7 @@ function RightPanelBubble({ msg, expanded, onToggleExpand, onNavigate }: {
           style={{ backgroundColor: avatarBg }}>🧠</div>
         <div className="max-w-[85%] flex flex-col items-end">
           <span className="text-xs text-muted-foreground">
-            {isSub ? `${msg.subagentName ?? "subagent"} · LLM` : `LLM (${msg.agentName ?? "root"})`}
+            {isSub ? `${msg.subagentName ?? "subagent"} · LLM` : `LLM (${mainAgentDisplayName({ agentName: msg.agentName })})`}
             {msg.model && <span className="ml-1 opacity-60 font-mono">{msg.model}</span>}
           </span>
           <div className={cn("rounded-2xl rounded-br-sm px-3 py-2 text-sm cursor-pointer whitespace-pre-wrap break-words", bubbleBg, "text-foreground")}
