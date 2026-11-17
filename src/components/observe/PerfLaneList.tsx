@@ -307,11 +307,11 @@ export function PerfLaneList({ lanes, laneExecs, t0, onOpenTurn }: {
                             <span className="w-8 shrink-0 text-center">#</span>
                             <span className="w-[72px] shrink-0 text-center">+Offset</span>
                             <span className="w-[80px] shrink-0 text-center">墙钟</span>
-                            <span className="w-[72px] shrink-0 text-center">LLM</span>
-                            <span className="w-[72px] shrink-0 text-center">LLM 外</span>
+                            <span className="w-[72px] shrink-0 text-center">活跃</span>
+                            <span className="w-[72px] shrink-0 text-center">非活跃</span>
                             <span className="min-w-0 flex-1 text-right">用量</span>
                           </div>
-                          {execs.map(({ ord, sliceMs, exec }) => (
+                          {execs.map(({ ord, wallMs, activeMs, inactiveMs, exec }) => (
                             <div
                               key={exec.executionId}
                               className="border-b border-black/[0.04] px-3 py-1.5 text-[11px] tabular-nums last:border-0 dark:border-white/[0.05]"
@@ -320,9 +320,9 @@ export function PerfLaneList({ lanes, laneExecs, t0, onOpenTurn }: {
                               <div className="flex items-center gap-3">
                                 <span className="w-8 shrink-0 text-center font-mono text-muted-foreground">#{ord}</span>
                                 <span className="w-[72px] shrink-0 text-center text-muted-foreground">{fmtOffset(t0, exec.createdAt)}</span>
-                                <span className="w-[80px] shrink-0 text-center font-semibold text-rose-600 dark:text-rose-400">{fmtMs(sliceMs)}</span>
-                                <span className="w-[72px] shrink-0 text-center text-indigo-600 dark:text-indigo-400">{fmtMs(Math.min(exec.latencyMs, sliceMs))}</span>
-                                <span className="w-[72px] shrink-0 text-center text-amber-600 dark:text-amber-500">{fmtMs(Math.max(0, sliceMs - exec.latencyMs))}</span>
+                                <span className="w-[80px] shrink-0 text-center font-semibold text-rose-600 dark:text-rose-400">{fmtMs(wallMs)}</span>
+                                <span className="w-[72px] shrink-0 text-center text-indigo-600 dark:text-indigo-400">{fmtMs(activeMs)}</span>
+                                <span className="w-[72px] shrink-0 text-center text-amber-600 dark:text-amber-500">{fmtMs(inactiveMs)}</span>
                                 <span className="min-w-0 flex-1 truncate text-right text-muted-foreground">
                                   {fmtTok(exec.tokens)} tok · LLM {exec.llmCallCount} · 工具 {exec.toolCallCount}
                                   {exec.toolCallErrorCount > 0 ? ` · 错 ${exec.toolCallErrorCount}` : ""}

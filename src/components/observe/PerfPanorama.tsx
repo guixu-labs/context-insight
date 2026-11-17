@@ -26,6 +26,7 @@ import { PerfToolTime } from "./PerfToolTime"
 import { AgentSwimlaneV2, type SwimTurnTarget } from "./AgentSwimlaneV2"
 import type { AgentItem, BridgeItem } from "./AgentCallGraph"
 import type { RunToolStats } from "@/lib/observe/collectors/tool-stats"
+import { clusterActiveSegments } from "@/lib/active-time"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface Props {
@@ -47,7 +48,6 @@ interface Props {
 
 interface PerfModel {
   sub: ExecItem[]
-  slices: number[]
   totalTokens: number
   totalInput: number
   totalOutput: number
@@ -55,27 +55,41 @@ interface PerfModel {
   totalCacheRead: number
   totalCacheWrite: number
   totalWall: number
-  totalLlmCapped: number
+  totalActive: number
+  totalInactive: number
   totalNonLlm: number
   t0: number
 }
 
-// ── 墙钟切片：每个执行占 start→next-start（末条回落自身 latency） ────────────
-function computeWallSlices(subtasks: ExecItem[]): number[] {
-  const starts = subtasks.map(r => new Date(r.createdAt).getTime())
+// ── 墙钟 = 全部执行 span 的包络：最早开始 → 最晚结束。不能按最后创建的
+//    执行 latency 收尾：最后创建的子代理可能先结束，也可能有后台子代理在主
+//    Agent 结束后才结束。切片仅用于 LLM 口径的逐任务钳制，不决定总墙钟。
+function computeWall(subtasks: ExecItem[]): { slices: number[]; start: number; end: number } {
+  const ranges = subtasks.map(r => {
+    const start = r.span?.start ?? new Date(r.createdAt).getTime()
+    const end = r.span?.end ?? start + Math.max(0, r.latencyMs)
+    return { start, end: Math.max(start, end) }
+  })
+  const start = Math.min(...ranges.map(r => r.start))
+  const end = Math.max(...ranges.map(r => r.end))
   const slices: number[] = []
-  for (let i = 0; i < subtasks.length; i++) {
-    if (i < subtasks.length - 1 && starts[i] && starts[i + 1]) {
-      slices.push(Math.max(0, starts[i + 1] - starts[i]))
-    } else {
-      slices.push(subtasks[i].latencyMs)
-    }
+  for (let i = 0; i < ranges.length; i++) {
+    const sliceEnd = i < ranges.length - 1 ? Math.min(ranges[i + 1].start, end) : end
+    slices.push(Math.max(0, sliceEnd - ranges[i].start))
   }
-  return slices
+  return { slices, start, end }
 }
 
-const DUR_LLM = "#6366f1"
-const DUR_NONLLM = "#f59e0b"
+function activeMsWithin(intervals: Array<{ start: number; end: number }>, start: number, end: number): number {
+  const clipped: Array<[number, number]> = intervals
+    .map(iv => [Math.max(start, iv.start), Math.min(end, iv.end)] as [number, number])
+    .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a)
+  return clusterActiveSegments(clipped, 0)
+    .reduce((sum, seg) => sum + Math.max(0, seg.end - seg.start), 0)
+}
+
+const DUR_ACTIVE = "#6366f1"
+const DUR_INACTIVE = "#f59e0b"
 
 export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayload }: Props) {
   const [items, setItems] = useState<ExecItem[] | null>(null)
@@ -209,35 +223,45 @@ export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayl
       .slice()
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     if (sub.length === 0) return null
-    const slices = computeWallSlices(sub)
+    const { slices, start: t0, end: wallEnd } = computeWall(sub)
+    const totalWall = Math.max(0, wallEnd - t0)
     const totalTokens = sub.reduce((s, r) => s + r.tokens, 0)
     const totalInput = sub.reduce((s, r) => s + r.inputTokens, 0)
     const totalOutput = sub.reduce((s, r) => s + r.outputTokens, 0)
     const totalReasoning = sub.reduce((s, r) => s + r.reasoningTokens, 0)
     const totalCacheRead = sub.reduce((s, r) => s + r.cacheReadInputTokens, 0)
     const totalCacheWrite = sub.reduce((s, r) => s + r.cacheCreationInputTokens, 0)
-    const totalWall = slices.reduce((s, x) => s + x, 0)
     // 逐任务钳制：LLM 耗时 = Σ min(latency, slice)；LLM 外 = 总 - LLM。处处闭合。
     const totalLlmCapped = sub.reduce((s, r, i) => s + Math.min(r.latencyMs, slices[i]), 0)
     const totalNonLlm = Math.max(0, totalWall - totalLlmCapped)
+    const totalActive = activeMsWithin(
+      sub.flatMap(r => r.activeIntervals ?? []),
+      t0,
+      wallEnd,
+    )
+    const totalInactive = Math.max(0, totalWall - totalActive)
 
     return {
-      sub, slices,
+      sub,
       totalTokens, totalInput, totalOutput, totalReasoning, totalCacheRead, totalCacheWrite,
-      totalWall, totalLlmCapped, totalNonLlm,
-      t0: new Date(sub[0].createdAt).getTime(),
+      totalWall, totalActive, totalInactive, totalNonLlm,
+      t0,
     }
   }, [items])
 
-  // 执行切片按单元归组（全局序号与画像墙钟同口径）
+  // 执行切片按单元归组：墙钟/活跃取该执行自身 span，不与其他执行共享切片。
   const laneExecs = useMemo(() => {
     const map = new Map<string, LaneExec[]>()
     if (!model) return map
     model.sub.forEach((exec, i) => {
       const key = exec.isSubagent ? exec.agentSessionId : exec.member?.taskId ?? null
       if (!key) return
+      const start = exec.span?.start ?? new Date(exec.createdAt).getTime()
+      const end = exec.span?.end ?? start + Math.max(0, exec.latencyMs)
+      const wallMs = Math.max(0, end - start)
+      const activeMs = activeMsWithin(exec.activeIntervals ?? [], start, end)
       const arr = map.get(key) ?? []
-      arr.push({ ord: i + 1, sliceMs: model.slices[i], exec })
+      arr.push({ ord: i + 1, wallMs, activeMs, inactiveMs: Math.max(0, wallMs - activeMs), exec })
       map.set(key, arr)
     })
     return map
@@ -338,11 +362,11 @@ export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayl
   )
 }
 
-// ── 运行画像（两区头卡，发丝分隔）：墙钟 hero（LLM/LLM 外时间构成）→
+// ── 运行画像（两区头卡，发丝分隔）：墙钟 hero（活跃/非活跃时间构成）→
 //    Token 构成。总量类指标（Tokens/Cost/LLM 调用/工具调用）不在此重复——
 //    Overview Σ瓦片单一源，Perf 只摆分解与比率 ─────────────────────────────
 function ProfileCard({ model }: { model: PerfModel }) {
-  const llmPct = model.totalWall > 0 ? (model.totalLlmCapped / model.totalWall * 100) : 0
+  const activePct = model.totalWall > 0 ? (model.totalActive / model.totalWall * 100) : 0
   const tokTotal = model.totalInput + model.totalCacheRead + model.totalCacheWrite + model.totalOutput + model.totalReasoning || 1
   const tokSegs = [
     { label: "输入", v: model.totalInput, c: TOKEN_COLORS.input },
@@ -355,12 +379,12 @@ function ProfileCard({ model }: { model: PerfModel }) {
     <Card {...perfEntrance(0, PERF_CARD_CLS)} data-testid="perf-profile-card">
       <CardContent className="px-5 pt-4 pb-4">
         <div className="divide-y divide-foreground/[0.06]">
-          {/* 区一：墙钟 hero + LLM/LLM 外构成条 */}
+          {/* 区一：墙钟 hero + 活跃/非活跃构成条 */}
           <div className="flex flex-wrap items-end gap-x-8 gap-y-3 pb-3.5">
             <div>
               <div className="flex items-baseline gap-2">
                 <span className="text-[13px] font-semibold">运行画像</span>
-                <span className="text-[11px] text-muted-foreground">{model.sub.length} 个执行切片 · 全成员融合</span>
+                <span className="text-[11px] text-muted-foreground">{model.sub.length} 条执行 · 全成员融合</span>
               </div>
               <div className="mt-1 text-[11px] text-muted-foreground">总耗时（墙钟）</div>
               <div className="text-[26px] font-semibold leading-tight tabular-nums">{fmtMs(model.totalWall)}</div>
@@ -369,17 +393,17 @@ function ProfileCard({ model }: { model: PerfModel }) {
               <div className="flex h-2 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full transition-[width] duration-500 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]"
-                  style={{ width: `${llmPct}%`, background: DUR_LLM }}
+                  style={{ width: `${activePct}%`, background: DUR_ACTIVE }}
                 />
               </div>
               <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] tabular-nums">
                 <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-sm" style={{ background: DUR_LLM }} />
-                  LLM {fmtMs(model.totalLlmCapped)} · {llmPct.toFixed(0)}%
+                  <span className="size-2 rounded-sm" style={{ background: DUR_ACTIVE }} />
+                  活跃 {fmtMs(model.totalActive)} · {activePct.toFixed(0)}%
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-sm" style={{ background: DUR_NONLLM }} />
-                  LLM 外 {fmtMs(model.totalNonLlm)} · {(100 - llmPct).toFixed(0)}%
+                  <span className="size-2 rounded-sm" style={{ background: DUR_INACTIVE }} />
+                  非活跃 {fmtMs(model.totalInactive)} · {(100 - activePct).toFixed(0)}%
                 </span>
               </div>
             </div>
@@ -413,7 +437,7 @@ function ProfileCard({ model }: { model: PerfModel }) {
           </div>
         </div>
         <div className="mt-3 text-[10px] text-muted-foreground/70">
-          总耗时 = start→next 切片 · LLM 耗时 = Σ min(latency, slice)（逐任务钳制）
+          总耗时 = 最早执行开始 → 最晚执行结束 · 活跃 = 执行区间并集 · 非活跃 = 墙钟 − 活跃
         </div>
       </CardContent>
     </Card>
