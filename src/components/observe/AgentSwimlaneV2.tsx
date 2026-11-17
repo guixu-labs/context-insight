@@ -15,7 +15,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { clusterActiveSegments } from "@/lib/active-time"
+import { ACTIVE_LATENCY_CAP_MS, clusterActiveSegments } from "@/lib/active-time"
 import { resolveSubagentIdentity } from "@/lib/subagent-identity"
 import { resolveLaneKey } from "@/lib/swimlane-lanes"
 import { assignLaneSlots, computeMaxConcurrency } from "@/lib/swimlane-slots"
@@ -29,6 +29,7 @@ const MAX_ZOOM = 64
 const ZOOM_FACTOR = 2
 const MAX_VISIBLE_HEIGHT = 300
 const THRESHOLD_PRESETS_MS = [60_000, 5 * 60_000, 15 * 60_000, 30 * 60_000]
+export const DEFAULT_SWIMLANE_THRESHOLD_MS = THRESHOLD_PRESETS_MS[1]
 // 单击（测距）要等这个窗口确认不是双击（跳转）的第一击
 const DBLCLICK_GUARD_MS = 250
 
@@ -105,16 +106,21 @@ export type SwimTurnTarget = {
   parentTurnId?: string | null
 }
 
-export function AgentSwimlaneV2({ agents, bridges, isProxy = false, onViewTurns, lanes = [], lanesInferred = false }: {
+export function AgentSwimlaneV2({ agents, bridges, isProxy = false, onViewTurns, lanes = [], lanesInferred = false, thresholdMs: thresholdProp, onThresholdChange }: {
   agents: AgentItem[]
   bridges: BridgeItem[]
   isProxy?: boolean
   onViewTurns?: (agentSessionId: string | null, sinceMs?: number, memberTaskId?: string | null, target?: SwimTurnTarget) => void
   lanes?: string[]
   lanesInferred?: boolean
+  /** 休眠阈值（受控）；缺省组件内部管理 */
+  thresholdMs?: number
+  onThresholdChange?: (ms: number) => void
 }) {
   const [zoom, setZoom] = useState(1)
-  const [thresholdMs, setThresholdMs] = useState(THRESHOLD_PRESETS_MS[1])
+  const [internalThresholdMs, setInternalThresholdMs] = useState(DEFAULT_SWIMLANE_THRESHOLD_MS)
+  const thresholdMs = thresholdProp ?? internalThresholdMs
+  const setThresholdMs = onThresholdChange ?? setInternalThresholdMs
   const [tooltip, setTooltip] = useState<TooltipData | null>(null)
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [measure, setMeasure] = useState<Measure | null>(null)
@@ -218,7 +224,10 @@ export function AgentSwimlaneV2({ agents, bridges, isProxy = false, onViewTurns,
     const m = new Map<string, Array<{ start: number; end: number }>>()
     for (const a of visible) {
       const raw = a.activeIntervals ?? []
-      const ivs: Array<[number, number]> = raw.map(s => [s.start, Math.min(s.end, s.start + thresholdMs)])
+      // proxy 的 wire duration_ms 可能含伪 latency：除泳道休眠阈值外，再套
+      // active-time 的 10min 可信上限；否则加档到 15/30min 时会把挂机桥进活跃。
+      const maxSpanMs = (a.member?.isProxy ?? isProxy) ? Math.min(thresholdMs, ACTIVE_LATENCY_CAP_MS) : thresholdMs
+      const ivs: Array<[number, number]> = raw.map(s => [s.start, Math.min(s.end, s.start + maxSpanMs)])
       m.set(a.executionId, clusterActiveSegments(ivs, thresholdMs))
     }
     return m

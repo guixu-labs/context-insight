@@ -23,10 +23,10 @@ import {
 } from "./perf-shared"
 import { PerfLaneList } from "./PerfLaneList"
 import { PerfToolTime } from "./PerfToolTime"
-import { AgentSwimlaneV2, type SwimTurnTarget } from "./AgentSwimlaneV2"
+import { AgentSwimlaneV2, DEFAULT_SWIMLANE_THRESHOLD_MS, type SwimTurnTarget } from "./AgentSwimlaneV2"
 import type { AgentItem, BridgeItem } from "./AgentCallGraph"
 import type { RunToolStats } from "@/lib/observe/collectors/tool-stats"
-import { clusterActiveSegments } from "@/lib/active-time"
+import { ACTIVE_LATENCY_CAP_MS, clusterActiveSegments } from "@/lib/active-time"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface Props {
@@ -58,6 +58,7 @@ interface PerfModel {
   totalActive: number
   totalInactive: number
   totalNonLlm: number
+  activeThresholdMs: number
   t0: number
 }
 
@@ -80,11 +81,21 @@ function computeWall(subtasks: ExecItem[]): { slices: number[]; start: number; e
   return { slices, start, end }
 }
 
-function activeMsWithin(intervals: Array<{ start: number; end: number }>, start: number, end: number): number {
+function clampedActiveIntervals(exec: ExecItem, thresholdMs: number): Array<{ start: number; end: number }> {
+  const maxSpanMs = exec.member?.isProxy ? Math.min(thresholdMs, ACTIVE_LATENCY_CAP_MS) : thresholdMs
+  return (exec.activeIntervals ?? []).map(iv => ({ start: iv.start, end: Math.min(iv.end, iv.start + maxSpanMs) }))
+}
+
+function activeMsWithin(
+  intervals: Array<{ start: number; end: number }>,
+  start: number,
+  end: number,
+  thresholdMs: number,
+): number {
   const clipped: Array<[number, number]> = intervals
     .map(iv => [Math.max(start, iv.start), Math.min(end, iv.end)] as [number, number])
     .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a)
-  return clusterActiveSegments(clipped, 0)
+  return clusterActiveSegments(clipped, thresholdMs)
     .reduce((sum, seg) => sum + Math.max(0, seg.end - seg.start), 0)
 }
 
@@ -93,6 +104,7 @@ const DUR_INACTIVE = "#f59e0b"
 
 export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayload }: Props) {
   const [items, setItems] = useState<ExecItem[] | null>(null)
+  const [thresholdMs, setThresholdMs] = useState(DEFAULT_SWIMLANE_THRESHOLD_MS)
   const [turns, setTurns] = useState<TurnPerf[] | null>(null)
   const [bridges, setBridges] = useState<BridgePerf[]>([])
   const [laneTable, setLaneTable] = useState<string[]>([])
@@ -235,19 +247,20 @@ export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayl
     const totalLlmCapped = sub.reduce((s, r, i) => s + Math.min(r.latencyMs, slices[i]), 0)
     const totalNonLlm = Math.max(0, totalWall - totalLlmCapped)
     const totalActive = activeMsWithin(
-      sub.flatMap(r => r.activeIntervals ?? []),
+      sub.flatMap(r => clampedActiveIntervals(r, thresholdMs)),
       t0,
       wallEnd,
+      thresholdMs,
     )
     const totalInactive = Math.max(0, totalWall - totalActive)
 
     return {
       sub,
       totalTokens, totalInput, totalOutput, totalReasoning, totalCacheRead, totalCacheWrite,
-      totalWall, totalActive, totalInactive, totalNonLlm,
+      totalWall, totalActive, totalInactive, totalNonLlm, activeThresholdMs: thresholdMs,
       t0,
     }
-  }, [items])
+  }, [items, thresholdMs])
 
   // 执行切片按单元归组：墙钟/活跃取该执行自身 span，不与其他执行共享切片。
   const laneExecs = useMemo(() => {
@@ -259,7 +272,7 @@ export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayl
       const start = exec.span?.start ?? new Date(exec.createdAt).getTime()
       const end = exec.span?.end ?? start + Math.max(0, exec.latencyMs)
       const wallMs = Math.max(0, end - start)
-      const activeMs = activeMsWithin(exec.activeIntervals ?? [], start, end)
+      const activeMs = activeMsWithin(clampedActiveIntervals(exec, model.activeThresholdMs), start, end, model.activeThresholdMs)
       const arr = map.get(key) ?? []
       arr.push({ ord: i + 1, wallMs, activeMs, inactiveMs: Math.max(0, wallMs - activeMs), exec })
       map.set(key, arr)
@@ -326,6 +339,8 @@ export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayl
             bridges={swimBridges}
             lanes={swimLanes}
             lanesInferred={laneTableInferred}
+            thresholdMs={thresholdMs}
+            onThresholdChange={setThresholdMs}
             onViewTurns={openSwimTurn}
           />
         </div>
@@ -437,7 +452,7 @@ function ProfileCard({ model }: { model: PerfModel }) {
           </div>
         </div>
         <div className="mt-3 text-[10px] text-muted-foreground/70">
-          总耗时 = 最早执行开始 → 最晚执行结束 · 活跃 = 执行区间并集 · 非活跃 = 墙钟 − 活跃
+          总耗时 = 最早执行开始 → 最晚执行结束 · 活跃 = 泳道同口径区间并集（{model.activeThresholdMs / 60_000}min 钳制/合并；proxy 单区间 ≤ 10min） · 非活跃 = 墙钟 − 活跃
         </div>
       </CardContent>
     </Card>

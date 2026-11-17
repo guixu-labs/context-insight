@@ -8,7 +8,7 @@
 - 【Audit 面板移除 Run 域】引擎型工作流的编排规程在数据里没有全局共享版本——各成员的「编排声明」实为各自的任务技能或派工单，Run 域拿排头成员的任务技能冒充 run 级声明对全 run 审计，名不副实。现 Audit 收敛为 Skill / Agent / Workflow 三域
 
 ### Fixed
-- 【Perf 墙钟截断】运行画像总耗时此前按最后创建执行的 latency 收尾，主 Agent 或后台子代理更晚结束时尾部会漏算；现统一取全部执行 span 的最早开始 → 最晚结束，并将构成改为执行区间并集的活跃 / 非活跃时间
+- 【Perf 墙钟截断】运行画像总耗时此前按最后创建执行的 latency 收尾，主 Agent 或后台子代理更晚结束时尾部会漏算；现统一取全部执行 span 的最早开始 → 最晚结束，并将构成改为与泳道同阈值的活跃 / 非活跃时间
 - 【原生 Codex Files 失效】原生 Codex 的 `exec_command` 使用 `cmd` 参数，Files 页此前只识别 `command`，导致 `cat` / `sed` / `head` 等文件读取全部显示为空；现兼容 `cmd` 字符串与数组形态，Files 分析恢复展示
 - 【solo 主模型归属】会话概览的主模型此前按全部 assistant 轮取众数，子代理轮较多时会把主 Agent 的模型覆盖成子代理模型；现导入与刷新时只统计主 Agent 轮
 - 【泳道 subagent 结束交接】执行时间线的主泳道此前只有整段双击跳主 Agent 首轮；现按 subagent 生命周期切分活跃段，subagent 结束后接续的主 Agent 活跃段归属刚结束的 subagent，双击优先跳到父 Agent 通过 `wait_agent` 收到该 subagent 回复的 turn；日志没有接收轮时回退到该 subagent 最后一轮
