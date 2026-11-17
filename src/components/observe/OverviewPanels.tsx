@@ -493,7 +493,7 @@ export function OverviewPanels({ identity, metrics, turns, skills, pending = fal
                   sub={
                     <div
                       className="flex items-center gap-1.5"
-                      title={`活跃 ${wallSplit!.active} · 非活跃 ${wallSplit!.inactive}（API 调用进行中计为活跃；间隔 >5min 的空档计为非活跃）`}
+                      title={`活跃 ${wallSplit!.active} · 非活跃 ${wallSplit!.inactive}（LLM/工具等工作窗口并集；固定 5min 间隔聚类）`}
                     >
                       <ActivityRing pct={activePct} size={14} stroke={2.5} />
                       <span className="min-w-0 flex-1 truncate text-[10px] font-medium tabular-nums leading-4 text-green-600 dark:text-green-400">

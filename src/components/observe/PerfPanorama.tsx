@@ -26,7 +26,8 @@ import { PerfToolTime } from "./PerfToolTime"
 import { AgentSwimlaneV2, DEFAULT_SWIMLANE_THRESHOLD_MS, type SwimTurnTarget } from "./AgentSwimlaneV2"
 import type { AgentItem, BridgeItem } from "./AgentCallGraph"
 import type { RunToolStats } from "@/lib/observe/collectors/tool-stats"
-import { ACTIVE_LATENCY_CAP_MS, clusterActiveSegments } from "@/lib/active-time"
+import { ACTIVE_GAP_THRESHOLD_MS, ACTIVE_LATENCY_CAP_MS, clusterActiveSegments } from "@/lib/active-time"
+import type { RunTimeSummary } from "@/lib/observe/run-time-summary"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface Props {
@@ -44,6 +45,8 @@ interface Props {
     /** 跳转解析用轮次（载荷直供时优先于端点取数） */
     turns?: TurnPerf[]
   } | null
+  /** Run 级统一时间摘要：Overview 与 Perf 数值单一源 */
+  timeSummary?: RunTimeSummary | null
 }
 
 interface PerfModel {
@@ -58,7 +61,6 @@ interface PerfModel {
   totalActive: number
   totalInactive: number
   totalNonLlm: number
-  activeThresholdMs: number
   t0: number
 }
 
@@ -81,28 +83,28 @@ function computeWall(subtasks: ExecItem[]): { slices: number[]; start: number; e
   return { slices, start, end }
 }
 
-function clampedActiveIntervals(exec: ExecItem, thresholdMs: number): Array<{ start: number; end: number }> {
-  const maxSpanMs = exec.member?.isProxy ? Math.min(thresholdMs, ACTIVE_LATENCY_CAP_MS) : thresholdMs
-  return (exec.activeIntervals ?? []).map(iv => ({ start: iv.start, end: Math.min(iv.end, iv.start + maxSpanMs) }))
+function normalizedActiveIntervals(exec: ExecItem): Array<{ start: number; end: number }> {
+  return (exec.activeIntervals ?? []).map(iv => iv.inferred
+    ? { start: Math.max(iv.start, iv.end - ACTIVE_LATENCY_CAP_MS), end: iv.end }
+    : { start: iv.start, end: iv.end })
 }
 
 function activeMsWithin(
   intervals: Array<{ start: number; end: number }>,
   start: number,
   end: number,
-  thresholdMs: number,
 ): number {
   const clipped: Array<[number, number]> = intervals
     .map(iv => [Math.max(start, iv.start), Math.min(end, iv.end)] as [number, number])
     .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a)
-  return clusterActiveSegments(clipped, thresholdMs)
+  return clusterActiveSegments(clipped, ACTIVE_GAP_THRESHOLD_MS)
     .reduce((sum, seg) => sum + Math.max(0, seg.end - seg.start), 0)
 }
 
 const DUR_ACTIVE = "#6366f1"
 const DUR_INACTIVE = "#f59e0b"
 
-export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayload }: Props) {
+export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayload, timeSummary = null }: Props) {
   const [items, setItems] = useState<ExecItem[] | null>(null)
   const [thresholdMs, setThresholdMs] = useState(DEFAULT_SWIMLANE_THRESHOLD_MS)
   const [turns, setTurns] = useState<TurnPerf[] | null>(null)
@@ -235,8 +237,10 @@ export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayl
       .slice()
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     if (sub.length === 0) return null
-    const { slices, start: t0, end: wallEnd } = computeWall(sub)
-    const totalWall = Math.max(0, wallEnd - t0)
+    const { slices, start: fallbackStart, end: wallEnd } = computeWall(sub)
+    const summaryStart = timeSummary?.start ? new Date(timeSummary.start).getTime() : NaN
+    const t0 = Number.isFinite(summaryStart) ? summaryStart : fallbackStart
+    const totalWall = timeSummary?.wallMs ?? Math.max(0, wallEnd - t0)
     const totalTokens = sub.reduce((s, r) => s + r.tokens, 0)
     const totalInput = sub.reduce((s, r) => s + r.inputTokens, 0)
     const totalOutput = sub.reduce((s, r) => s + r.outputTokens, 0)
@@ -245,22 +249,24 @@ export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayl
     const totalCacheWrite = sub.reduce((s, r) => s + r.cacheCreationInputTokens, 0)
     // 逐任务钳制：LLM 耗时 = Σ min(latency, slice)；LLM 外 = 总 - LLM。处处闭合。
     const totalLlmCapped = sub.reduce((s, r, i) => s + Math.min(r.latencyMs, slices[i]), 0)
-    const totalNonLlm = Math.max(0, totalWall - totalLlmCapped)
-    const totalActive = activeMsWithin(
-      sub.flatMap(r => clampedActiveIntervals(r, thresholdMs)),
+    const fallbackActive = activeMsWithin(
+      sub.flatMap(r => normalizedActiveIntervals(r)),
       t0,
       wallEnd,
-      thresholdMs,
     )
-    const totalInactive = Math.max(0, totalWall - totalActive)
+    const totalActive = timeSummary?.activeMs ?? fallbackActive
+    const totalInactive = timeSummary?.idleMs ?? Math.max(0, totalWall - totalActive)
+    const totalNonLlm = timeSummary
+      ? Math.max(0, totalWall - timeSummary.llmActiveMs)
+      : Math.max(0, totalWall - totalLlmCapped)
 
     return {
       sub,
       totalTokens, totalInput, totalOutput, totalReasoning, totalCacheRead, totalCacheWrite,
-      totalWall, totalActive, totalInactive, totalNonLlm, activeThresholdMs: thresholdMs,
+      totalWall, totalActive, totalInactive, totalNonLlm,
       t0,
     }
-  }, [items, thresholdMs])
+  }, [items, timeSummary])
 
   // 执行切片按单元归组：墙钟/活跃取该执行自身 span，不与其他执行共享切片。
   const laneExecs = useMemo(() => {
@@ -272,7 +278,7 @@ export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayl
       const start = exec.span?.start ?? new Date(exec.createdAt).getTime()
       const end = exec.span?.end ?? start + Math.max(0, exec.latencyMs)
       const wallMs = Math.max(0, end - start)
-      const activeMs = activeMsWithin(clampedActiveIntervals(exec, model.activeThresholdMs), start, end, model.activeThresholdMs)
+      const activeMs = activeMsWithin(normalizedActiveIntervals(exec), start, end)
       const arr = map.get(key) ?? []
       arr.push({ ord: i + 1, wallMs, activeMs, inactiveMs: Math.max(0, wallMs - activeMs), exec })
       map.set(key, arr)
@@ -452,7 +458,7 @@ function ProfileCard({ model }: { model: PerfModel }) {
           </div>
         </div>
         <div className="mt-3 text-[10px] text-muted-foreground/70">
-          总耗时 = 最早执行开始 → 最晚执行结束 · 活跃 = 泳道同口径区间并集（{model.activeThresholdMs / 60_000}min 钳制/合并；proxy 单区间 ≤ 10min） · 非活跃 = 墙钟 − 活跃
+          总耗时 = 全执行 span 包络 · 活跃 = 工作窗口并集（固定 5min 聚类） · 显示阈值只影响泳道分段 · 非活跃 = 墙钟 − 活跃
         </div>
       </CardContent>
     </Card>

@@ -48,6 +48,7 @@ import { useRunHostCaps } from "@/lib/run/host-caps";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { RunMemberIdentity, RunMemberStats } from "@/lib/collection/types";
+import type { RunTimeSummary } from "@/lib/observe/run-time-summary";
 import type { RunViewModel } from "@/lib/run/view-model";
 import { useRunView, type RunTabKey } from "@/app/run/[runId]/run-view";
 import { Loader2Icon, ArrowLeftIcon, UploadIcon, FileTextIcon, GlobeIcon, RefreshCwIcon, WifiIcon, AlertTriangleIcon } from "lucide-react";
@@ -81,6 +82,8 @@ interface RunDetailResponse {
   codeStats?: { additions: number; deletions: number; files: number } | null;
   /** 成员工具调用/技能失败计数（同 session 页 Errors 口径；失败 null） */
   totalErrors?: number | null;
+  /** Run 级统一时间摘要（Overview/Perf 共用） */
+  timeSummary?: RunTimeSummary | null;
 }
 
 /** 页面渲染表（刀A：Overview + Graph；刀B：+ Turns + Trace；刀C：+ Context + Perf；
@@ -734,6 +737,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
               run={run}
               viewModel={viewModel}
               memberStats={data.memberStats ?? null}
+              timeSummary={data.timeSummary ?? null}
               totalErrors={data.totalErrors ?? null}
               members={data.members ?? []}
               codeStats={data.codeStats ?? null}
@@ -782,6 +786,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
             <RunPerfTab
               key={identityEpoch}
               runId={run.runId}
+              timeSummary={data.timeSummary ?? null}
               onOpenTurn={turnId => navigate({ tab: "turns", turnId })}
               onOpenSearch={q => navigate({ tab: "turns", q })}
             />

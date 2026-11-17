@@ -32,6 +32,7 @@ import { bandLabel } from "@/components/run/run-theme";
 import { computeLlmActiveMs } from "@/lib/session-duration";
 import { useRunDataEpoch } from "@/lib/run/data-epoch";
 import { summarizeToolCallErrors } from "@/lib/tool-call-errors";
+import type { RunTimeSummary } from "@/lib/observe/run-time-summary";
 
 /** run 展示短标题：prompt 自动命名的长文按句读截短（先句子边界、再逗号
  *  分句、超长硬截 32 字），全文与 runId 进悬停 */
@@ -63,6 +64,8 @@ export interface RunOverviewTabProps {
   };
   viewModel: RunViewModel;
   memberStats: RunMemberStats | null;
+  /** Run 级统一时间摘要（与 Perf 共用） */
+  timeSummary?: RunTimeSummary | null;
   totalErrors: number | null;
   /** 成员身份名册（run 详情端点）：Tool/proxy 徽标逐成员判定（混布可见） */
   members: RunMemberIdentity[];
@@ -73,7 +76,7 @@ export interface RunOverviewTabProps {
   onOpenSkills?: () => void;
 }
 
-export function RunOverviewTab({ runId, run, viewModel, memberStats, totalErrors, members, codeStats, onOpenTurns, onOpenSkills }: RunOverviewTabProps) {
+export function RunOverviewTab({ runId, run, viewModel, memberStats, timeSummary, totalErrors, members, codeStats, onOpenTurns, onOpenSkills }: RunOverviewTabProps) {
   // 面板数据：页面挂载瞬间已由 page 预取（五端点全并行，见 overview-data），
   // 此处消费缓存 promise——通常 tab 挂载时数据已就绪或已在途；数据纪元变化
   // 消费 reloadRun 换新的 fresh promise（原地重取，tab 不重挂）。pending 驱动
@@ -107,8 +110,8 @@ export function RunOverviewTab({ runId, run, viewModel, memberStats, totalErrors
       memberCount: members.length || memberStats?.joinedCount || 0,
       model,
       codeStats: codeStats,
-      startTime: memberStats?.earliestStart ?? run.startedAt ?? null,
-      endTime: memberStats?.latestEnd ?? run.finishedAt ?? null,
+      startTime: timeSummary?.start ?? memberStats?.earliestStart ?? run.startedAt ?? null,
+      endTime: timeSummary?.end ?? memberStats?.latestEnd ?? run.finishedAt ?? null,
       // bundle 取导入源目录；solo（无导入清单）取成员会话行源路径
       sourcePath: run.import?.sourceDir ?? (rows.length === 1 ? rows[0].sourcePath : null),
       run: {
@@ -120,7 +123,7 @@ export function RunOverviewTab({ runId, run, viewModel, memberStats, totalErrors
         runId: run.runId,
       },
     };
-  }, [members, memberStats, rows, codeStats, run]);
+  }, [members, memberStats, timeSummary, rows, codeStats, run]);
 
   const metrics = useMemo<OverviewMetrics>(() => {
     const llmActiveMs = turns.length > 0
@@ -137,16 +140,16 @@ export function RunOverviewTab({ runId, run, viewModel, memberStats, totalErrors
     return {
       totalTokens: memberStats?.totalTokens ?? 0,
       totalCost: memberStats?.totalCost ?? 0,
-      wallMs: memberStats?.totalDurationMs ?? null,
-      activeMs: memberStats?.totalActiveMs ?? null,
-      llmActiveMs,
+      wallMs: timeSummary?.wallMs ?? memberStats?.totalDurationMs ?? null,
+      activeMs: timeSummary?.activeMs ?? memberStats?.totalActiveMs ?? null,
+      llmActiveMs: timeSummary?.llmActiveMs ?? llmActiveMs,
       llmCallCount: agents.reduce((sum, a) => sum + (a.llmCallCount ?? 0), 0),
       toolCallCount: agents.reduce((sum, a) => sum + (a.toolCallCount ?? 0), 0),
       subagentCount: panel?.subagentCount ?? 0,
       errorCount: clientErrorCount,
       totalTurns: memberStats?.totalTurns ?? null,
     };
-  }, [turns, totalErrors, memberStats, agents, panel]);
+  }, [turns, totalErrors, memberStats, timeSummary, agents, panel]);
 
   // run-graph 专属区块（结构卡/导入信息）：solo run 是无主会话合成的
   // 单例包装，没有图结构与导入清单——视图与 session 页对齐；bundle 常态全量

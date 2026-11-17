@@ -34,7 +34,7 @@ export interface AgentItem {
   span?: { start: number; end: number } | null
   // 每个 turn 的原始区间（不合并、不截断）：按当前「休眠阈值」前端重聚类成活跃段画深色；
   // span 里其余部分就是休眠，画浅色。
-  activeIntervals?: Array<{ start: number; end: number }>
+  activeIntervals?: Array<{ start: number; end: number; inferred?: boolean }>
   firstPrompt: string | null
   /** run executions 收集器注入（AgentItem 超集）：Σ 指标卡消费 */
   llmCallCount?: number

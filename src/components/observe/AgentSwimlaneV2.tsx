@@ -224,10 +224,11 @@ export function AgentSwimlaneV2({ agents, bridges, isProxy = false, onViewTurns,
     const m = new Map<string, Array<{ start: number; end: number }>>()
     for (const a of visible) {
       const raw = a.activeIntervals ?? []
-      // proxy 的 wire duration_ms 可能含伪 latency：除泳道休眠阈值外，再套
-      // active-time 的 10min 可信上限；否则加档到 15/30min 时会把挂机桥进活跃。
-      const maxSpanMs = (a.member?.isProxy ?? isProxy) ? Math.min(thresholdMs, ACTIVE_LATENCY_CAP_MS) : thresholdMs
-      const ivs: Array<[number, number]> = raw.map(s => [s.start, Math.min(s.end, s.start + maxSpanMs)])
+      const ivs: Array<[number, number]> = raw.map(s => {
+        // 仅反推窗口套 10min 可信上限；真实 completedAt 窗口只受显示阈值影响。
+        const maxSpanMs = s.inferred ? Math.min(thresholdMs, ACTIVE_LATENCY_CAP_MS) : thresholdMs
+        return [s.start, Math.min(s.end, s.start + maxSpanMs)]
+      })
       m.set(a.executionId, clusterActiveSegments(ivs, thresholdMs))
     }
     return m

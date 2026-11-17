@@ -26,6 +26,7 @@ import { getActiveSplitMap } from '@/lib/active-time-map';
 import { aggregateMemberStats } from '@/lib/collection/run-asset';
 import { pageSessionErrorTotal } from '@/lib/collection/session-asset';
 import type { RunMemberIdentity, RunMemberStats } from '@/lib/collection/types';
+import { buildRunTimeSummary, type RunTimeSummary } from '@/lib/observe/run-time-summary';
 import { isSoloRunId, soloTaskIdOf } from '@/lib/run/identity';
 import { resolveSoloRun } from '@/lib/run/solo';
 import { invalidateObservationCaches } from '@/lib/observe/invalidation';
@@ -37,7 +38,7 @@ import { invalidateObservationCaches } from '@/lib/observe/invalidation';
 async function aggregateRunObservability(
   runId: string,
   lookup: Map<string, SessionRef>,
-): Promise<{ memberStats: RunMemberStats | null; totalErrors: number | null; members: RunMemberIdentity[]; codeStats: { additions: number; deletions: number; files: number } | null }> {
+): Promise<{ memberStats: RunMemberStats | null; totalErrors: number | null; members: RunMemberIdentity[]; codeStats: { additions: number; deletions: number; files: number } | null; timeSummary: RunTimeSummary | null }> {
   try {
     const activeByRow = await getActiveSplitMap(
       [...lookup.values()]
@@ -50,6 +51,25 @@ async function aggregateRunObservability(
         })),
     );
     const memberStats = aggregateMemberStats(lookup, activeByRow);
+    const [timeSessions, timeTurns] = await Promise.all([
+      prisma.session.findMany({
+        where: { id: { in: memberStats.memberRowIds } },
+        select: { id: true, startTime: true, endTime: true, version: true },
+      }),
+      prisma.turn.findMany({
+        where: { sessionId: { in: memberStats.memberRowIds } },
+        select: {
+          sessionId: true,
+          role: true,
+          isSubagent: true,
+          subagentSessionId: true,
+          createdAt_ts: true,
+          completedAt: true,
+          latencyMs: true,
+        },
+      }),
+    ]);
+    const timeSummary = buildRunTimeSummary(timeSessions, timeTurns);
     const totalErrors = await pageSessionErrorTotal(prisma, memberStats.memberRowIds);
     const members: RunMemberIdentity[] = [...lookup.values()]
       .map(r => ({ taskId: r.taskId, framework: r.framework, version: r.version ?? null, label: r.label }))
@@ -64,11 +84,11 @@ async function aggregateRunObservability(
       deletions: summaryRows.reduce((s, r) => s + (r.summaryDeletions ?? 0), 0),
       files: summaryRows.reduce((s, r) => s + (r.summaryFiles ?? 0), 0),
     } : null;
-    return { memberStats, totalErrors, members, codeStats };
+    return { memberStats, totalErrors, members, codeStats, timeSummary };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     logError('route:observe/run/[runId]', '成员观测聚合失败（详情降级）', { runId, error: message });
-    return { memberStats: null, totalErrors: null, members: [], codeStats: null };
+    return { memberStats: null, totalErrors: null, members: [], codeStats: null, timeSummary: null };
   }
 }
 
@@ -92,7 +112,7 @@ export const GET = withRouteLog(
         const lookup = new Map<string, SessionRef>([[taskId, solo.ref]]);
         await attachSessionScores(lookup, prisma);
         attachSessionRefs(vm, lookup);
-        const { memberStats, totalErrors, members, codeStats } = await aggregateRunObservability(runId, lookup);
+        const { memberStats, totalErrors, members, codeStats, timeSummary } = await aggregateRunObservability(runId, lookup);
         return NextResponse.json({
           run: {
             runId,
@@ -109,6 +129,7 @@ export const GET = withRouteLog(
           members,
           codeStats,
           totalErrors,
+          timeSummary,
         });
       }
       const stored = readRun(runId);
@@ -121,7 +142,7 @@ export const GET = withRouteLog(
       const lookup = await joinSessionRefs(stored.index, prisma);
       await attachSessionScores(lookup, prisma);
       attachSessionRefs(vm, lookup);
-      const { memberStats, totalErrors, members, codeStats } = await aggregateRunObservability(runId, lookup);
+      const { memberStats, totalErrors, members, codeStats, timeSummary } = await aggregateRunObservability(runId, lookup);
       return NextResponse.json({
         run: {
           runId: stored.runId,
@@ -138,6 +159,7 @@ export const GET = withRouteLog(
         members,
         codeStats,
         totalErrors,
+        timeSummary,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';

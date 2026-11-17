@@ -34,7 +34,7 @@ export interface AgentSpanTurn {
 
 export interface AgentSpanEntry {
   span: { start: number; end: number } | null
-  activeIntervals: Array<{ start: number; end: number }>
+  activeIntervals: Array<{ start: number; end: number; inferred?: boolean }>
 }
 
 // 身份键必须让 root 与任何 subagent 互不重叠：subagentSessionId 在 schema 里
@@ -48,14 +48,15 @@ export function agentSpanKey(isSubagent: boolean, agentSessionId: string | null)
 
 export function buildAgentSpans(turns: AgentSpanTurn[], isProxy: boolean): Map<string, AgentSpanEntry> {
   const spanByKey = new Map<string, { start: number; end: number }>()
-  const intervalsByKey = new Map<string, Array<{ start: number; end: number }>>()
+  const intervalsByKey = new Map<string, Array<{ start: number; end: number; inferred?: boolean }>>()
   for (const t of turns) {
     const key = agentSpanKey(t.isSubagent, t.subagentSessionId)
     const rawStart = t.createdAt_ts ?? t.completedAt
     if (!rawStart) continue
     const start = rawStart.getTime()
     const end = Math.max(start, (t.completedAt ?? rawStart).getTime())
-    const intervalStart = isProxy && !t.completedAt && t.latencyMs > 0
+    const inferred = isProxy && !t.completedAt && t.latencyMs > 0
+    const intervalStart = inferred
       ? start - t.latencyMs
       : start
 
@@ -64,7 +65,7 @@ export function buildAgentSpans(turns: AgentSpanTurn[], isProxy: boolean): Map<s
     else { sp.start = Math.min(sp.start, start); sp.end = Math.max(sp.end, end) }
 
     const arr = intervalsByKey.get(key) ?? []
-    arr.push({ start: intervalStart, end })
+    arr.push({ start: intervalStart, end, inferred })
     intervalsByKey.set(key, arr)
   }
   const out = new Map<string, AgentSpanEntry>()

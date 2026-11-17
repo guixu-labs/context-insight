@@ -15,16 +15,19 @@
 import { useMemo } from "react";
 import { PerfPanorama } from "@/components/observe/PerfPanorama";
 import { useRunDataEpoch } from "@/lib/run/data-epoch";
+import type { RunTimeSummary } from "@/lib/observe/run-time-summary";
 
 export interface RunPerfTabProps {
   runId: string;
+  /** Run 级统一时间摘要（Overview/Perf 共用） */
+  timeSummary?: RunTimeSummary | null;
   /** 定位出口：turnId → Turns 深链（工作台外壳收口） */
   onOpenTurn: (turnId: string) => void;
   /** 搜索出口：Turns 搜索语法深链（工具耗时卡下钻——工作台外壳收口） */
   onOpenSearch?: (q: string) => void;
 }
 
-export function RunPerfTab({ runId, onOpenTurn, onOpenSearch }: RunPerfTabProps) {
+export function RunPerfTab({ runId, timeSummary, onOpenTurn, onOpenSearch }: RunPerfTabProps) {
   const dataEpoch = useRunDataEpoch();
   const endpoints = useMemo(() => {
     const base = `/api/observe/run/${encodeURIComponent(runId)}`;
@@ -39,7 +42,7 @@ export function RunPerfTab({ runId, onOpenTurn, onOpenSearch }: RunPerfTabProps)
 
   return (
     <div className="flex flex-col gap-4 overflow-y-auto rounded-2xl bg-muted/30 p-4">
-      <PerfPanorama endpoints={endpoints} onOpenTurn={onOpenTurn} onOpenSearch={onOpenSearch} />
+      <PerfPanorama endpoints={endpoints} timeSummary={timeSummary ?? null} onOpenTurn={onOpenTurn} onOpenSearch={onOpenSearch} />
     </div>
   );
 }
