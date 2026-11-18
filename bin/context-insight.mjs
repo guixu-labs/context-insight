@@ -226,6 +226,7 @@ async function startWebUi(rawArgs) {
   const legacyJunk = path.join(PKG_DIR, DATA_DIR, '.next')
   if (legacyJunk !== distDir) rmSync(legacyJunk, { recursive: true, force: true })
   process.env.DATABASE_URL = `file:${dbPath}`
+  if (!existsSync(dbPath)) writeFileSync(dbPath, '')
   process.env.NEXT_PUBLIC_SHOW_ADVANCED_TABS = advanced ? 'true' : 'false'
 
   log(`Node ${process.versions.node} ✓`)
