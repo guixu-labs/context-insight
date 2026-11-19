@@ -221,6 +221,14 @@ describe("源断言（回归锁：多人零残留的关键路径）", () => {
     expect(LAUNCHER_SRC).toContain("writeFileSync(PID_FILE")
   })
 
+  it("全新数据目录先创建空 SQLite 文件——避免 Prisma schema engine 无法建库", () => {
+    const createIdx = LAUNCHER_SRC.indexOf("if (!existsSync(dbPath)) writeFileSync(dbPath, '')")
+    const migrateIdx = LAUNCHER_SRC.indexOf("runPrisma(['migrate', 'deploy'])")
+    expect(createIdx).toBeGreaterThan(-1)
+    expect(migrateIdx).toBeGreaterThan(-1)
+    expect(createIdx).toBeLessThan(migrateIdx)
+  })
+
   it("findFreePort 已退役——固定端口语义不漂移", () => {
     expect(LAUNCHER_SRC).not.toContain("findFreePort")
     expect(PORTS_SRC).not.toContain("findFreePort")
