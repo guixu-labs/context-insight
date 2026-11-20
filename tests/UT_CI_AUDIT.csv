@@ -1,0 +1,109 @@
+path,source_kind,area,static_test_declarations,describe_topics,verdict,reason
+tests/ut/active-time-cap.test.ts,unit,shared,2,computeSessionActiveSplit · latency 上限截断,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/bigint-json.test.ts,unit,shared,2,bigint-json 垫片：安全整数界内的序列化无损、越界响亮失败,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/bridge-builder-opencode2-subagent.test.ts,unit,ingest,7,turn-split：args.agent 结构化值守卫 | bridge-builder: opencode 2.x subagent 派发方言,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/bridge-builder-reuse-dispatch.test.ts,unit,ingest,3,bridge-builder：reuseDispatch 自定义派发形态,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/bridge-builder-spawn-forms.test.ts,unit,ingest,5,bridge-builder: spawn 双形态与失败派发（0.162 真机链）,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/bridge-builder-subagent-handback.test.ts,unit,ingest,2,bridge-builder：后台子代理回传不自锚,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/bridge-reuse-dispatch-window.test.ts,unit,ingest,4,bridge-builder: 复用会话的派发窗配对 | bridge-builder: meta 直连 ≠ result 会话 id 的窗口配对,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/chart-geometry.test.ts,unit,observe-ui,6,monotonePath（单调三次：不回拐、不过冲） | lttb（降采样：保首尾、保子集、按阈值收敛）,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/cost-calculator.test.ts,unit,ai,12,cost-calculator | calculateCost with glm-5 model | calculateCost for unknown model | calculateCostNullSafe | MODEL_PRICING table | cost validation against existing usage.cost,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/data-service.test.ts,unit,ingest,7,computeSessionAggregates,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/dispatch-skill-events.test.ts,unit,ingest,7,codex spawn_agent 派发事件（真机现场：3 次派发、Audit agent 域恒 0） | 既有派发框架不回归（dispatch-tools 注册表单源）,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/dispatch-tools.test.ts,unit,ingest,23,dispatchSpecOf：工具名匹配矩阵 | resolveDispatchToolCall：参数键解析 | backfillTurnNamesFromDispatches：Turn 名字回填 | dispatch-tools：回传工具不算派发（包含式族反例）,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/export-kernel.test.tsx,unit,export,12,合成器①：run turns 分页（MergedTurnItem 投影） | 合成器②：turns/search（服务端同一 matchTurnSearch 单点） | 合成器③：turns/by-index（#N 跨成员解析，成员序） | fetch 拦截链（静态档案 → 动态合成器 → catch-all）,ut-pure,离线内核 fetch 合成与投影逻辑；无浏览器真实渲染。
+tests/ut/file-restore.test.ts,unit,ingest,26,file-restore | extractFilePath / extractOffset | parseReadLines | parseWriteLines | restoreFile | renderRestoredText,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/framework-display.test.ts,unit,observe-ui,5,framework 显示词表单点,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/input-reconstruct.test.ts,unit,ingest,14,input-reconstruct — compact-aware LLM input window | opencode compaction: agent-based detection | toWireOrder,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/lake-files-root.test.ts,filesystem-integration,lake,3,lake 文件根锚定：CONTEXT_PROXY_DIR > CONTEXT_INSIGHT_HOME > 真实 home,ut-pure,只验证环境变量到路径的决议顺序，不读写真实文件。
+tests/ut/lake-lfs-resolution.test.ts,unit,lake,4,insight LFS 决议链（env > config > 默认开）,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/lake-token-prompt.test.ts,unit,lake,7,resolveRemoteAddress：当前生效远端 | findStoredAuthEntry：已存凭据匹配（后端键归一同语义） | isCredentialErrorCode：凭据类错误码判定 | credentialPromptCopy：触发语境文案,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/merge.test.ts,unit,ingest,21,merge | dedupSession | ranked keys (Bug #7) | mergeSkillEvents | diffTurns | diffToolCalls,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/offline-kernel.test.ts,unit,export,2,离线内核轮详情：输入窗口重建计数口径,ut-pure,离线内核请求合成逻辑；无 DB/网络，使用内存数据。
+tests/ut/phase-split.test.ts,unit,ingest,6,splitWorkflow marker-driven phase division,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/run-edge-geometry.test.ts,unit,observe-ui,8,edge-geometry：链点正交化 | edge-geometry：平行段错开（nudging）,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/run-time-summary.test.ts,unit,observe-ui,3,RunTimeSummary 口径,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/score-export-name.test.ts,unit,observe-ui,3,score 导出文件名单一源,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/scoring-rule-scores.test.ts,unit,scoring-audit,7,ruleScoresOf：评分卡规则层（Run 融合取分口径）,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/scoring-workflow-scope.test.ts,unit,scoring-audit,3,D1.goalCoverage 工作流范围声明,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/skill-content.test.ts,unit,observe-ui,35,skillMdReadsOfToolCall（shell 通道归因——现场污染形态） | selectSkillContent（行号校准合并——现场 01a1c5d6 形态） | skillMdReadsOfToolCall（三通道单点分类器） | codex exec input 形态 shell 读（检测面与归因面同源） | skillMdReadsOfTurn（斜杠命令注入轮） | skill-content | extractSkillNameFromReadPath | stripSkillPreamble | …,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/skill-invocations.test.ts,unit,ingest,17,detectSkillInvocations — read 类工具通道 | detectSkillInvocations — shell 读类命令通道,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/subagent-timing.test.ts,unit,shared,6,subagentTiming,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/swimlane-lanes.test.ts,unit,observe-ui,10,resolveLaneKey：步骤文本 → 车道键 | inferLanes：派发描述 → 车道表（内容签名推断）,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/swimlane-slots.test.ts,unit,observe-ui,6,assignLaneSlots：车道池 + 贪心,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/tool-call-errors.test.ts,unit,ingest,41,classifyToolCallError: 中性分类学（持久层兜底单点） | extractErrorEvidence: 跨框架失败证据提取 | codexExecFailureOf: 卷回失败语义解析（形态 → 桶映射单点） | terminalErrorReasonOf: 终端错误原因行提取（尾部扫描 + 保守词表） | toolCallErrorKind: 退出码证据精判（头部 + 非零定性） | toolCallErrorKind: codex 形态兼容（存量行 state 仍 completed） | toolCallErrorMessage: 消息提取（持久化 errorMessage 优先） | tool-call-errors: summarizeToolCallErrors | …,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/tool-conventions.test.ts,unit,ingest,38,tool-conventions（框架工具调用约定） | parseReadToolArgs | isSkillToolCall | skillEventTypeOf | extractSkillName | extractSkillVersion | normalizeToolResultPayload（结果负载归一） | unwrapSkillContent（skill 结果协议壳） | …,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/turn-align-manual.test.ts,unit,ingest,12,alignTurnsWithManual,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/turn-align.test.ts,unit,ingest,15,alignTurns | computeAlignStats | computeContentDiff | similarityLabel,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/turn-block-order.test.ts,unit,ingest,4,appendSubagentBlocksOrdered：子代理块派发正序,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/turn-search-grammar.test.ts,unit,observe-ui,12,matchTurnSearch 全能语法,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/turn-search-toolname.test.ts,unit,observe-ui,5,matchTurnSearch 工具名路（第六路）,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/turns-query.test.ts,unit,observe-ui,12,parseTurnsQuery 词法 | rowPassesFilters 行级谓词,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/zip-store.test.ts,unit,ingest,11,zip-store | crc32 | normalizeZipPath | buildZip,ut-pure,直接验证纯函数/纯数据转换，无 DB、浏览器、网络、进程或可变文件状态。
+tests/ut/adapters/claude-jsonl-skill-merge.test.ts,unit,ingest,3,claude-jsonl adapter: consecutive skill-injection merge,ut-fixture,只读取仓库内固定夹具，断言确定性解析/算法结果，无共享可变状态。
+tests/ut/bridge-builder.test.ts,filesystem-integration,ingest,31,bridge-builder | with simple synthetic data (single task() call with subagent) | with multiple subagents (2+ task() calls) | unmatched task() call (no corresponding subagent) | status logic | with full synthetic data (from synthetic-opencode.json) | edge cases,ut-fixture,读取固定 synthetic JSON，核心是纯 bridge 构建逻辑。
+tests/ut/dsh-decode.test.ts,filesystem-integration,ingest,15,DSH 解码：多帧拼接 zstd（DSH 真实写入形态） | DSH 解码：尾部截断（会话正在写入） | DSH 解码：坏输入不得静默成功 | DSH 解码：行级容错,ut-fixture,读取固定 zstd 夹具验证解码逻辑，可作为 fixture UT。
+tests/ut/execution-split.test.ts,filesystem-integration,ingest,22,execution-split | with synthetic data (has root + subagent) | subagent 类型通道纪律（昵称≠类型） | session with no subagents produces just 1 root ExecutionRow | edge cases,ut-fixture,读取固定 synthetic JSON 验证纯 execution 聚合。
+tests/ut/file-reads.test.ts,filesystem-integration,ingest,36,file-reads | parseReadToolArgs | isDirectoryRead | computeRange | rangesOverlap | mergeIntervals | analyzeReads | extractExecFileReads（codex exec 形态） | …,ut-fixture,主要验证读区间归并/覆盖算法，夹具只读。
+tests/ut/normalize.test.ts,filesystem-integration,ingest,14,normalize | opencode-db source | claude-jsonl source | unknown source,ut-fixture,读取固定 synthetic JSON 验证 normalize 字段规则。
+tests/ut/run-reader.test.ts,filesystem-integration,observe-ui,15,reader：结构样例全量断言 | reader：校验矩阵（错误 = 拒绝导入） | reader：警告矩阵（容忍态，不阻断） | reader：存量旧格式兼容读（annotation.graph / annotation.type）,ut-fixture,读取固定 manifest 验证 reader/index 纯解析。
+tests/ut/run-view-model.test.ts,filesystem-integration,observe-ui,30,"view-model：节点实例（(nodeId, generation) 聚簇） | view-model：回滚记录 | view-model：视图（主图 + 子图） | view-model：拐弯最小化（非必要不拐弯） | view-model：右行下单调走线（依赖边水平段只向右） | view-model：run 级汇总 | view-model：端口分布（P2 布线简洁） | view-model：留白压缩（P2 真实节点稠密列） | …",ut-fixture,读取固定 run fixture 验证 view-model 纯投影与布局。
+tests/ut/scoring-profile.test.ts,filesystem-integration,scoring-audit,17,sanitizeProfile：硬错拒绝 | sanitizeProfile：软伤剥离进 warnings | applyProfile：覆盖变换 | 聚合回归锁 | 内置模板健全性,ut-fixture,主要验证 profile sanitize/apply 与模板，仅用隔离目录承接模块配置。
+tests/ut/turn-split.test.ts,filesystem-integration,ingest,49,turn-split | with synthetic data | edge cases | opencode general dispatch（新版工作流：subagent_type=general/缺失，角色在 prompt）,ut-fixture,读取固定 synthetic JSON 验证纯 turn/tool/skill 切分。
+tests/ut/adapters/claude-agent-injection.test.ts,unit,ingest,20,classifyAgentInjection（指纹分类） | readSession（handback 协议混合夹具，端到端） | 首真人查询回落（data-service.firstHumanQueryText） | 会话 Query 决议（data-service.resolveSessionQuery）,split-before-ut,指纹分类是纯逻辑；readSession 读取 JSONL 夹具属于 adapter 集成，需拆文件。
+tests/ut/adapters/claude-jsonl.test.ts,filesystem-integration,ingest,50,claude-jsonl adapter | listSessions | readSession | system-reminder splitting | proxy system lines (cannbot-proxy extended claude-format) | wire 捕获 system 组件噪声治理（token 倒计时 + 重复注入去重） | wire 捕获 tool_result 历史重放（首现胜出） | subagent full context resolution | …,split-before-ut,同时覆盖解析规则与临时文件目录发现，建议拆成 parser UT 和 adapter IT。
+tests/ut/adapters/index.test.ts,unit,ingest,5,adapter registry,split-before-ut,registry 查找是纯逻辑；listSessions/readSession 依赖真实目录，需拆分。
+tests/ut/bench-report-overlay.test.ts,filesystem-integration,scoring-audit,3,applyBenchReport（读时覆盖）,split-before-ut,评分重算逻辑有价值，但测试通过临时文件驱动，建议拆纯重算与文件 overlay。
+tests/ut/context-window-config.test.ts,filesystem-integration,observe-ui,5,getContextWindowLimit 内置表解析,split-before-ut,内置表是纯逻辑；外部 config 通过临时文件覆盖，建议拆分。
+tests/ut/envelope.test.ts,filesystem-integration,ingest,9,readEnvelope 单轨读 | readEnvelopeWithLegacy（meta 读侧兼容：改名前上传的旧 meta 仍可读） | envelopeFields 单轨写 | 源级哨兵：信封键字面量唯一定义（envelope 模块外零内联）,split-before-ut,信封读写是纯逻辑；同时扫描源码字面量属于 architecture contract，需拆分。
+tests/ut/lake-credential-plan.test.ts,filesystem-integration,lake,5,planCredentialAction（保存时服务端凭据操作决策） | handleSave 接线（源级锁）,split-before-ut,决策函数是纯逻辑；另含设置页源码接线扫描，需拆分。
+tests/ut/scoring-v2-core.test.ts,filesystem-integration,scoring-audit,53,聚合引擎 · three-state（组合表是数据） | 聚合引擎 · average-with-floor（正确性不及格总分不许及格） | 聚合引擎 · weighted-average / count-deduction / direct | 整卡聚合：否决 + 覆盖度 + 权重归一 | shell 拆分（自研轻量） | digest 用户交互小节（提问工具答复可见性） | 测试输出解析（D1.verifiedRun/D3.testResults 共用） | judge 输出三层约束 | …,split-before-ut,绝大多数为纯评分算法；含一个文件存储用例，建议拆分。
+tests/ut/scoring-v2-dims.test.ts,filesystem-integration,scoring-audit,82,D1 组合表（三态数据驱动） | D2 规则层（宁宽：确凿才否决） | D3 / D5 / D6 直算层 | D6 用户发言过滤：系统注入与派发回放不算（现场 §f4c5b028 23 组 | LLM 层纪律（stub LlmClient） | D4 并行度（区间并集） | D4 上下文水位（压缩） | D4 轮次比值 | …,split-before-ut,绝大多数为评分维度纯逻辑；少量 baseline/profile 临时目录用例，建议拆分。
+tests/ut/skill-dispatch-display.test.ts,unit,ingest,17,skill dispatch display integration | extractSkillNameFromArgs: skill name extraction | groupSkillEvents: dispatch groups have result data | groupSkillEvents: total counts,split-before-ut,grouping 提取是纯逻辑；同时通过 JSONL adapter 建 turn，建议拆分。
+tests/ut/system-structure-dispatch.test.ts,unit,ingest,11,system-structure 分发（捕获框架 → 提取器） | codex 提取器（<skills_instructions> 闭合块，真机 0.161 形态） | opencode 家族提取器（<available_skills> xml + Instructions from: 记忆段） | claude 提取器（proxy 扩展 system 字段——旧路径恒空的修复 + native 行为保持） | 隔离锁：异框架结构标记不越界,split-before-ut,提取器是纯逻辑；多数用例通过真实 JSONL 文件驱动，建议拆分。
+tests/ut/compare-perf/banded-dp-correctness.test.ts,unit,performance,10,alignTurns — banded DP at scale | alignTurns — adaptive band covers length-mismatched sessions | alignTurnsWithManual — prepared cache at scale | alignTurns — banded precision vs full matrix,perf,含 500~4000 规模与耗时阈值，应进性能/回归 lane，不占快速 UT。
+tests/ut/compare-perf/estimate-time.test.ts,unit,performance,10,estimateAlignTimeMs — covers transfer + align + render | estimateAlignTimeBreakdown — phase decomposition | estimateAlignTimeMs — sanity vs actual alignTurns,perf,主体是估算公式，但包含真实 align 耗时对照，建议拆出纯公式 UT。
+tests/ut/turn-align-hard.test.ts,unit,ingest,1,Hard alignment stress tests,perf,硬对齐压力矩阵，应归 perf。
+tests/ut/turn-align-stress.test.ts,unit,ingest,1,Complex alignment stress tests,perf,复杂对齐压力矩阵，应归 perf。
+tests/ut/adapters/context-insight.test.ts,filesystem-integration,observe-ui,5,context-insight adapter listSessions | context-insight adapter readSessionMeta（会话级身份声明）,pipeline,依赖 adapter/导入/文件解析整链，应归 pipeline IT。
+tests/ut/claude-jsonl-capture-read.test.ts,filesystem-integration,ingest,10,parseJsonlLines — Buffer 逐行读取 | detectContent — 有界读头（探测不整文件读入）,pipeline,依赖 adapter/导入/文件解析整链，应归 pipeline IT。
+tests/ut/claude-jsonl-queued-message.test.ts,filesystem-integration,ingest,4,claude-jsonl：插队消息（attachment/queued_command）升格 user 轮,pipeline,依赖 adapter/导入/文件解析整链，应归 pipeline IT。
+tests/ut/claude-jsonl-skip-logging.test.ts,filesystem-integration,ingest,6,claude-jsonl 跳过行分级告警,pipeline,依赖 adapter/导入/文件解析整链，应归 pipeline IT。
+tests/ut/claude-jsonl-truncated-turn.test.ts,filesystem-integration,ingest,3,claude-jsonl：截断空轮保留（stopReason=length + content=[]）,pipeline,依赖 adapter/导入/文件解析整链，应归 pipeline IT。
+tests/ut/codex-chain.test.ts,filesystem-integration,ingest,10,codex 捕获路径（cpx → claude-jsonl → turn-split） | codex 原生 rollout 路径（codex-jsonl → turn-split） | usage.reasoning_tokens 读侧兜底（旧版捕获件：信封缺 reasoningTokens）,pipeline,依赖 adapter/导入/文件解析整链，应归 pipeline IT。
+tests/ut/codex-exec-error-channel.test.ts,unit,ingest,10,codex 错误通道：适配器卷回解析（剥壳前定语义） | codex 错误通道：turn-split passthrough-first 持久化,pipeline,adapter 读取 JSONL 后串 turn-split，属于导入管线集成。
+tests/ut/compression.test.ts,filesystem-integration,ingest,4,ensure7z 大文件路径（零字符串中转） | 未还原 LFS 指针探测（readCaptureBuffer / decompressToPlain 统一入口拦截）,pipeline,依赖 adapter/导入/文件解析整链，应归 pipeline IT。
+tests/ut/dsh-native.test.ts,unit,ingest,13,DSH 原生：事件 → RawInteraction 转义 | DSH 原生：发现 / 列举 / 子代理建链 | DSH 原生：注册表嗅探 | DSH 原生：与 normalize / turn-split / bridge 端到端建桥 | DSH 路径识别（JSONL tab 自动分流用）,pipeline,覆盖磁盘布局发现、读取和建桥整链，属于 pipeline。
+tests/ut/opencode-subagent-title.test.ts,filesystem-integration,ingest,4,opencode 子代理标题双格式解析,pipeline,依赖 adapter/导入/文件解析整链，应归 pipeline IT。
+tests/ut/proxy-classify.test.ts,filesystem-integration,ingest,15,classifyProxyCapture 代际信号 | isClaudeFormatSession 扩展到全 proxy 捕获,pipeline,依赖 adapter/导入/文件解析整链，应归 pipeline IT。
+tests/ut/run-schema-validate.test.ts,filesystem-integration,observe-ui,14,validateWithBundleSchema | validateBundleDir 集成,pipeline,依赖 adapter/导入/文件解析整链，应归 pipeline IT。
+tests/ut/skill-dispatch-integration.test.ts,unit,ingest,16,skill dispatch integration | adapter layer | turn-split: Agent dispatch SkillEvent | computeSessionAggregates: skill counts,pipeline,从 JSONL adapter 到 turn-split/aggregate 的集成链。
+tests/ut/skill-md-scan.test.ts,filesystem-integration,observe-ui,7,resolveWorkflowSkillName,pipeline,依赖 adapter/导入/文件解析整链，应归 pipeline IT。
+tests/ut/tool-call-timing.test.ts,filesystem-integration,ingest,6,claude-jsonl 工具时间戳采集 | opencode v1 工具时间戳采集 | 无时间源降级,pipeline,依赖 adapter/导入/文件解析整链，应归 pipeline IT。
+tests/ut/tool-timing.test.ts,filesystem-integration,ingest,4,deriveToolTiming（wire 轮间隙） | wireToolDurations（Perf 侧门控）,pipeline,依赖 adapter/导入/文件解析整链，应归 pipeline IT。
+tests/ut/user-injection-dispatch.test.ts,unit,ingest,5,注入分类框架分发（行级 source → 框架指纹，fixture 驱动）,pipeline,通过真实 JSONL 夹具验证 adapter 框架分流，属于 pipeline。
+tests/ut/export-service.test.ts,filesystem-integration,export,10,export-service INSERT column/placeholder parity | export-service run() arg count matches VALUES placeholder count | regression guard: Session 30-vs-31 bug,service,依赖模块 mock、fetch、store 或查询编排，应归 service/data-api。
+tests/ut/lake-test-account-it.test.ts,unit,lake,3,test 连接属主文案：oauth2 兜底占位不参与「所填账户」不一致判定,service,mock git/fetch 验证远端测试连接编排与文案，不是纯逻辑。
+tests/ut/lake_viewer/insight-data-recording.test.ts,unit,lake,3,getScorecard recording 消歧,service,mock Prisma 验证查询条件，应归 service/data-api。
+tests/ut/run-store.test.ts,filesystem-integration,observe-ui,7,run-store：目录管理 | run-store：数据主目录锚定,service,依赖模块 mock、fetch、store 或查询编排，应归 service/data-api。
+tests/ut/scoring-mate-retry.test.ts,filesystem-integration,scoring-audit,3,runMateAgentDimension 保底重试（最多两次）,service,依赖模块 mock、fetch、store 或查询编排，应归 service/data-api。
+tests/ut/scoring-store-and-llm.test.ts,filesystem-integration,scoring-audit,2,scorecardStore 并发写串行化 | TrackedLlmClient 成本记账（每次真实消耗）,service,依赖模块 mock、fetch、store 或查询编排，应归 service/data-api。
+tests/ut/skill-audit-job.test.ts,unit,scoring-audit,11,skill-audit-job (cross-tab resume),service,验证 fetch/NDJSON/sessionStorage/模块级 store 编排，应归 service/component。
+tests/ut/turn-detail-cache.test.ts,filesystem-integration,observe-ui,3,readFullContext 读侧缓存 | LruCache 基元,service,验证文件 mtime 缓存与 gzip 失效，属于 storage/runtime IT。
+tests/ut/agent-md-scan.test.ts,filesystem-integration,observe-ui,9,scanAgentDirs | resolveAgentMd,infra,依赖真实 socket/filesystem/process/日志/构建环境，应归 infra。
+tests/ut/agent-md-session-recover.test.ts,filesystem-integration,observe-ui,12,recoverAgentMdFromSystem（system 注入恢复——正常会话主路径）,infra,依赖真实 socket/filesystem/process/日志/构建环境，应归 infra。
+tests/ut/api-route-log.test.ts,filesystem-integration,infra,5,withRouteLog 包装器,infra,依赖真实 socket/filesystem/process/日志/构建环境，应归 infra。
+tests/ut/browse-roots.test.ts,filesystem-integration,import,3,fsRootsFor — win32（多盘符，无公共根） | fsRootsFor — POSIX（单一根）,infra,依赖真实 socket/filesystem/process/日志/构建环境，应归 infra。
+tests/ut/build-identity.test.ts,filesystem-integration,infra,3,build-identity 构建标识读取,infra,依赖真实 socket/filesystem/process/日志/构建环境，应归 infra。
+tests/ut/db-env-guard.test.ts,filesystem-integration,infra,10,envFileDatabaseUrl：.env* 提供的 DATABASE_URL 解析 | isEnvFileLeakedUrl：泄漏判定,infra,依赖真实 socket/filesystem/process/日志/构建环境，应归 infra。
+tests/ut/ensure-native-smoke.test.ts,filesystem-integration,infra,3,ensure-native 子进程冒烟契约（离线）,infra,依赖真实 socket/filesystem/process/日志/构建环境，应归 infra。
+tests/ut/launcher-multi-user.test.ts,filesystem-integration,infra,11,ctxi --stop（击杀锚定：PID 文件 + 候选区间验明正身，绝不盲杀） | 固定端口语义（多人服务器：每人固定端口，绝不静默漂移） | 源断言（回归锁：多人零残留的关键路径）,infra,依赖真实 socket/filesystem/process/日志/构建环境，应归 infra。
+tests/ut/launcher-ports.test.ts,unit,infra,4,启动器端口编排（bin/ports.mjs）,infra,真实 socket/http/进程探测，应归 infra。
+tests/ut/logger.test.ts,filesystem-integration,infra,19,logger 核心机制,infra,依赖真实 socket/filesystem/process/日志/构建环境，应归 infra。
+tests/ut/mate-guide-fallback.test.ts,unit,ai,3,Mate Agent GUIDE 读取兜底,infra,验证真实 GUIDE 文件读取与回退路径，应归 infra。
+tests/ut/sift-runner.test.ts,filesystem-integration,scoring-audit,14,runSiftAuditStreaming (via makeStreamingAuditResponse) | SiftProgressModel（完成行驱动进度模型） | 多 slice（--kind skill 切片）进度 | 静默看门狗,infra,依赖真实 socket/filesystem/process/日志/构建环境，应归 infra。
+tests/ut/lake-lfs-read-prep-it.test.ts,filesystem-integration,lake,2,,lake,依赖 lake/Git/LFS/凭据环境，应归 lake IT。
+tests/ut/lake-mirror-cred.test.ts,filesystem-integration,lake,4,镜像仓级凭据自持（syncMirrorCredentials）,lake,依赖 lake/Git/LFS/凭据环境，应归 lake IT。
+tests/ut/lake-url-hijack-it.test.ts,filesystem-integration,lake,4,lake URL 劫持隔离（全局 insteadOf 不改写显式合同）,lake,依赖 lake/Git/LFS/凭据环境，应归 lake IT。
+tests/ut/lake-zero-builtin.test.ts,filesystem-integration,lake,3,跨包源码零内置凭据（防回潮锁） | 平台中性哨兵（平台化 P1-P3 防回潮锁，词表源 sensitive-info-audit）,contract,源码/词表扫描哨兵，属于 contract，不是行为单测。
+tests/ut/log-adoption.test.ts,filesystem-integration,infra,1,日志采用率哨兵：所有 route.ts 必须有错误日志通道,contract,扫描 route.ts 源码覆盖率，属于 contract。

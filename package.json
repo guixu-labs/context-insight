@@ -25,7 +25,7 @@
   "scripts": {
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
-  "prebuild": "node scripts/build-guard.mjs",
+    "prebuild": "node scripts/build-guard.mjs",
     "build:export-view": "node scripts/build-export-view.mjs",
     "start": "next start -H 127.0.0.1",
     "postinstall": "node scripts/postinstall.mjs",
@@ -39,6 +39,9 @@
     "pretest:bench": "node scripts/ensure-native.mjs && node scripts/ensure-test-db.mjs",
     "test": "vitest run && playwright test",
     "test:cov": "npm run pretest && vitest run tests/ut --coverage",
+    "test:ut": "vitest run --config vitest.ut.config.ts",
+    "test:ut:pure": "vitest run --config vitest.ut.config.ts --project ut-pure",
+    "test:ut:fixture": "vitest run --config vitest.ut.config.ts --project ut-fixture",
     "test:watch": "vitest",
     "cli": "tsx src/cli/index.ts",
     "test:cli": "vitest run tests/ut/cli/",
