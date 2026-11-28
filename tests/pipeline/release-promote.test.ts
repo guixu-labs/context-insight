@@ -40,7 +40,7 @@ if (sub === "view") {
 }
 `
 
-function runPromote(distTags: Record<string, Record<string, string>>) {
+function runPromote(distTags: Record<string, Record<string, string>>, version = "1.0.0") {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "release-promote-it-"))
   fs.writeFileSync(path.join(tmp, "npm"), FAKE_NPM, { mode: 0o755 })
   const statePath = path.join(tmp, "state.json")
@@ -49,7 +49,7 @@ function runPromote(distTags: Record<string, Record<string, string>>) {
 
   const result = spawnSync(
     "node",
-    [PROMOTE_PATH, "--version", "1.0.0", "--confirm", "1.0.0", "--prune-legacy", "true"],
+    [PROMOTE_PATH, "--version", version, "--confirm", version, "--prune-legacy", "true"],
     {
       encoding: "utf8",
       env: {
@@ -66,6 +66,13 @@ function runPromote(distTags: Record<string, Record<string, string>>) {
 }
 
 describe("scripts/release/promote.mjs atomicity", () => {
+  it("beta 预发布版本不能提升到 latest", () => {
+    const { status, log, stderr } = runPromote({}, "1.0.0-beta.20261128.1.1")
+    expect(status).not.toBe(0)
+    expect(log).toEqual([])
+    expect(stderr).toContain("latest promotion requires a stable version")
+  })
+
   it("任一包未发布时：先只读校验，两包均不产生任何 dist-tag 变更", () => {
     // 第二个包 cannbot-insight 无 dist-tag 指向 1.0.0 → 未发布；第一个包已发布。
     // 原子语义要求：即便 context-insight 已就绪，也不得先动它的 latest。
