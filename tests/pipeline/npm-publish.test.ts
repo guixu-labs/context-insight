@@ -22,6 +22,7 @@ import { describe, it, expect } from "vitest"
 import { spawn, spawnSync } from "node:child_process"
 import fs from "node:fs"
 import { createServer } from "node:http"
+import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { VERSION } from "../../src/lib/version"
@@ -153,6 +154,17 @@ describe("release registry verification workflow", () => {
     const publishJob = publishWorkflow.slice(publishWorkflow.indexOf("\n  publish:"))
     expect(publishJob).toContain("if: inputs.mode == 'publish'")
     expect(publishJob).toContain("name: Verify selected dist-tag")
+    expect(publishWorkflow).toContain("prepare-beta-version.mjs --print")
+    expect(publishWorkflow).toContain("source_sha")
+    expect(publishWorkflow).toContain("name: Create beta release tag")
+    expect(publishWorkflow).toContain("VERSION: ${{ steps.version.outputs.version }}")
+    const validateStart = publishWorkflow.indexOf("name: Validate release identity")
+    const validateEnd = publishWorkflow.indexOf("\n  build:", validateStart)
+    const validateStep = publishWorkflow.slice(validateStart, validateEnd)
+    expect(validateStep).toContain('--version "$VERSION"')
+    expect(validateStep).not.toContain('--version "${{ needs.preflight.outputs.version }}"')
+    expect(fs.readFileSync(path.join(PKG_DIR, ".github/workflows/release-dry-run.yml"), "utf8"))
+      .toContain("name: Apply automatic beta version")
   })
 
   it("promote 在移动 latest 后做有界轮询验证", () => {
@@ -217,4 +229,164 @@ describe("release registry verification workflow", () => {
     }
   }, 10_000)
 
+})
+
+describe("automatic beta version", () => {
+  const fakeNpm = `#!/usr/bin/env node
+const args = process.argv.slice(2)
+if (args[0] !== "view") process.exit(2)
+if (args[1].includes("@")) process.exit(1)
+process.stdout.write(JSON.stringify({ latest: "1.0.8", beta: "1.0.6-beta.1" }))
+`
+
+  it("从 stable 基线生成下一个 patch 的 beta 版本", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "prepare-beta-version-"))
+    fs.writeFileSync(path.join(tmp, "npm"), fakeNpm, { mode: 0o755 })
+    const result = spawnSync(process.execPath, ["scripts/release/prepare-beta-version.mjs", "--print"], {
+      cwd: PKG_DIR,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${tmp}${path.delimiter}${process.env.PATH ?? ""}`,
+        GITHUB_RUN_NUMBER: "777",
+        GITHUB_RUN_ATTEMPT: "2",
+      },
+    })
+    fs.rmSync(tmp, { recursive: true, force: true })
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout.trim()).toMatch(/^1\.0\.9-beta\.\d{8}\.777\.2$/)
+  })
+
+  it("beta preflight 不需要 tag，也不检查 package.json 预发布版本", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "beta-preflight-"))
+    fs.writeFileSync(path.join(tmp, "npm"), fakeNpm, { mode: 0o755 })
+    fs.writeFileSync(path.join(tmp, "git"), `#!/usr/bin/env node
+const args = process.argv.slice(2)
+if (args[0] === "rev-parse") { process.stdout.write("abc123\\n"); process.exit(0) }
+process.exit(2)
+`, { mode: 0o755 })
+
+    const version = "1.0.9-beta.20261128.777.2"
+    const result = spawnSync(process.execPath, [
+      "scripts/release/preflight-publish.mjs",
+      "--version", version,
+      "--mode", "publish",
+      "--dist-tag", "beta",
+    ], {
+      cwd: PKG_DIR,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${tmp}${path.delimiter}${process.env.PATH ?? ""}` },
+    })
+    fs.rmSync(tmp, { recursive: true, force: true })
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
+    expect(result.stdout).toContain(`[release-preflight] publish: (auto) / ${version} / beta OK`)
+  })
+
+  it("显式 beta 版本只写入 runner 临时版本源，不要求仓库 check-in", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "beta-version-files-"))
+    const versionPath = path.join(tmp, "src/lib/version.ts")
+    fs.mkdirSync(path.dirname(versionPath), { recursive: true })
+    fs.copyFileSync(path.join(PKG_DIR, "package.json"), path.join(tmp, "package.json"))
+    fs.copyFileSync(path.join(PKG_DIR, "src/lib/version.ts"), versionPath)
+    const lockSource = path.join(PKG_DIR, "package-lock.json")
+    const lockTarget = path.join(tmp, "package-lock.json")
+    if (fs.existsSync(lockSource)) fs.copyFileSync(lockSource, lockTarget)
+
+    const version = "1.0.9-beta.20261128.777.2"
+    const result = spawnSync(process.execPath, [
+      "scripts/release/prepare-beta-version.mjs",
+      "--root", tmp,
+      "--version", version,
+    ], { cwd: PKG_DIR, encoding: "utf8" })
+    const pkg = JSON.parse(fs.readFileSync(path.join(tmp, "package.json"), "utf8"))
+    const versionSource = fs.readFileSync(versionPath, "utf8")
+    const lock = fs.existsSync(lockTarget)
+      ? JSON.parse(fs.readFileSync(lockTarget, "utf8"))
+      : null
+    fs.rmSync(tmp, { recursive: true, force: true })
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(pkg.version).toBe(version)
+    expect(versionSource).toContain(`export const VERSION = "${version}"`)
+    if (lock) {
+      expect(lock.version).toBe(version)
+      if (lock.packages?.[""]) expect(lock.packages[""].version).toBe(version)
+    }
+  })
+})
+
+describe("registry install propagation retry", () => {
+  it("dist-tag 可见但 npm install 暂时 ETARGET 时会在同一 deadline 内重试", async () => {
+    const server = createServer((_request, response) => {
+      response.setHeader("content-type", "application/json")
+      response.end(JSON.stringify({ beta: "9.9.9" }))
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject)
+      server.listen(0, "127.0.0.1", resolve)
+    })
+    const address = server.address()
+    if (!address || typeof address === "string") throw new Error("missing test registry port")
+
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "registry-install-retry-"))
+    const counterPath = path.join(tmp, "counts.json")
+    fs.writeFileSync(path.join(tmp, "npm"), `#!/usr/bin/env node
+const fs = require('node:fs');
+const path = require('node:path');
+const args = process.argv.slice(2);
+if (args[0] !== 'install') process.exit(2);
+const prefix = args[args.indexOf('--prefix') + 1];
+const spec = args[args.indexOf('--prefix') + 2];
+const name = spec.split('@')[0];
+const counts = fs.existsSync(${JSON.stringify(counterPath)}) ? JSON.parse(fs.readFileSync(${JSON.stringify(counterPath)}, 'utf8')) : {};
+if (name === 'cannbot-insight' && !counts[name]) {
+  counts[name] = 1;
+  fs.writeFileSync(${JSON.stringify(counterPath)}, JSON.stringify(counts));
+  console.error('npm error code ETARGET');
+  process.exit(1);
+}
+counts[name] = (counts[name] || 0) + 1;
+fs.writeFileSync(${JSON.stringify(counterPath)}, JSON.stringify(counts));
+fs.mkdirSync(path.join(prefix, 'bin'), { recursive: true });
+const commands = name === 'context-insight'
+  ? { 'context-insight': 'Context-Insight v9.9.9', ctxi: 'Context-Insight v9.9.9' }
+  : { 'cannbot-insight': 'CANNBot-Insight v9.9.9', cbi: 'CANNBot-Insight v9.9.9' };
+for (const [command, output] of Object.entries(commands)) {
+  const file = path.join(prefix, 'bin', command);
+  fs.writeFileSync(file, '#!/bin/sh\\necho "' + output + '"\\n', { mode: 0o755 });
+}
+`, { mode: 0o755 })
+
+    try {
+      const result = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+        const child = spawn(process.execPath, [
+          "scripts/release/verify-registry.mjs",
+          "--tag", "beta",
+          "--version", "9.9.9",
+          "--wait-seconds", "5",
+          "--poll-seconds", "1",
+          "--registry", `http://127.0.0.1:${address.port}/`,
+        ], {
+          cwd: PKG_DIR,
+          env: { ...process.env, PATH: `${tmp}${path.delimiter}${process.env.PATH ?? ""}` },
+        })
+        let stdout = ""
+        let stderr = ""
+        child.stdout.on("data", (chunk) => { stdout += chunk })
+        child.stderr.on("data", (chunk) => { stderr += chunk })
+        child.once("error", reject)
+        child.once("close", (code) => resolve({ code, stdout, stderr }))
+      })
+
+      expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0)
+      expect(result.stdout).toContain("[registry-install] attempt 1: cannbot-insight@beta not installable yet")
+      expect(result.stdout).toContain("[registry-smoke] context-insight@beta (9.9.9)")
+      expect(result.stdout).toContain("[registry-smoke] cannbot-insight@beta (9.9.9)")
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true })
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 15_000)
 })
