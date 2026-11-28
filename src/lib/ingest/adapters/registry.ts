@@ -18,6 +18,7 @@ import {
   listSessions as claudeJsonlListSessions,
   readSession as claudeJsonlReadSession,
   readSubagentInteractions as claudeJsonlReadSubagents,
+  listSessionFiles as claudeJsonlListSessionFiles,
   collectSubagentLinkageMaps,
   extractVersion as extractClaudeVersion,
   detectContent as detectClaudeContent,
@@ -27,21 +28,24 @@ import {
   listSessions as codexJsonlListSessions,
   readSession as codexJsonlReadSession,
   readSubagentInteractions as codexJsonlReadSubagents,
+  listSessionFiles as codexJsonlListSessionFiles,
   extractVersion as extractCodexVersion,
   detectContent as detectCodexContent,
   deriveSessionIdFromPath as deriveCodexSessionId,
 } from './codex-jsonl';
 import { isRolloutFileName } from './codex-naming';
-import { listSessions as contextInsightListSessions, readSession as contextInsightReadSession, readSessionMeta as contextInsightReadSessionMeta, detectContent as detectContextContent } from './context-insight';
+import { listSessions as contextInsightListSessions, listSessionFiles as contextInsightListSessionFiles, readSession as contextInsightReadSession, readSessionMeta as contextInsightReadSessionMeta, detectContent as detectContextContent } from './context-insight';
 import {
   listSessions as dshNativeListSessions,
   readSession as dshNativeReadSession,
   readSubagentInteractions as dshNativeReadSubagents,
+  listSessionFiles as dshNativeListSessionFiles,
   extractVersion as dshNativeExtractVersion,
   isDshSessionLogName,
   deriveSessionId as deriveDshSessionId,
 } from '../dsh-bridge/native';
 import { detectContent as detectDshContent } from '../dsh-detect';
+import { isProxyVersion } from '../../shared/session-format';
 
 // ── 源注册表 ─────────────────────────────────────────────────────────
 // 每个源在这里声明一次（字段见 contract.ts 的 SourceDescriptor）。导入接口、
@@ -79,6 +83,7 @@ const codexJsonlSource: SourceDescriptor = {
   listSessions: codexJsonlListSessions,
   readSession: codexJsonlReadSession,
   readSubagents: codexJsonlReadSubagents,
+  listSessionFiles: codexJsonlListSessionFiles,
   extractVersion: extractCodexVersion,
   // 按 rollout- 前缀认 codex 文件：必须排在 claude-jsonl（按 .jsonl 认）前面，
   // 否则 codex 的 rollout-*.jsonl 会被当成 claude 文件
@@ -93,6 +98,7 @@ const dshNativeSource: SourceDescriptor = {
   listSessions: dshNativeListSessions,
   readSession: dshNativeReadSession,
   readSubagents: dshNativeReadSubagents,
+  listSessionFiles: dshNativeListSessionFiles,
   extractVersion: dshNativeExtractVersion,
   // 按固定文件名认 DSH 文件（session.v4.jsonl / session.v4.jsonl.zstd）：必须排在
   // claude-jsonl（按 .jsonl 认）前面，否则 .jsonl 那种会被当成 claude 文件
@@ -108,6 +114,7 @@ const claudeJsonlSource: SourceDescriptor = {
   listSessions: claudeJsonlListSessions,
   readSession: claudeJsonlReadSession,
   readSubagents: claudeJsonlReadSubagents,
+  listSessionFiles: claudeJsonlListSessionFiles,
   collectSubagentLinkage: collectSubagentLinkageMaps,
   extractVersion: extractClaudeVersion,
   // 按 .jsonl 结尾认文件：任何 jsonl 都先按 claude 格式试着解析。放最后，
@@ -127,6 +134,8 @@ const contextInsightSource: SourceDescriptor = {
   listSessions: contextInsightListSessions,
   readSession: contextInsightReadSession,
   readSessionMeta: contextInsightReadSessionMeta,
+  // 导出件本身就是这个会话的原件：整件即文件集（无子代理/meta 伴随件）
+  listSessionFiles: contextInsightListSessionFiles,
   // 前缀嗅探：context_session_ 为本品牌导出件；cannbot_session_ 为存量
   // （≤0.2.40 cannbot 品牌导出件）——两前缀并认，老导出件继续可导入
   sniffFile: (fileName) => isSqliteName(fileName) && (fileName.startsWith('context_session_') || fileName.startsWith('cannbot_session_')),
@@ -221,6 +230,24 @@ export function detectSourceByContent(filePath: string): string | null {
     } catch { /* best-effort：单源探测异常不阻断其余源认领 */ }
   }
   return null;
+}
+
+/** 已落库会话行 → 源描述符（deltaRefresh / 原始文件集解析共用的适配器路由，
+ *  格式轴单点）。格式是文件的属性——sourcePath 内容探测优先；文件缺失 /
+ *  不认领才回落身份轴：proxy 捕获（claude / opencode / codex，version 带
+ *  -proxy 后缀）都是 claude 格式 jsonl 变体 → claude-jsonl；原生 framework →
+ *  sourceOfFramework 单点反查。无 sourcePath 或路由不出 → null。 */
+export function sourceOfSessionRow(session: {
+  sourcePath: string | null;
+  framework: string | null;
+  version: string | null;
+}): SourceDescriptor | null {
+  if (!session.sourcePath) return null;
+  const sourceType = detectSourceByContent(session.sourcePath)
+    ?? (isProxyVersion(session.version) || session.framework?.endsWith('-proxy')
+      ? 'claude-jsonl'
+      : (session.framework != null ? (sourceOfFramework(session.framework) ?? session.framework) : null));
+  return sourceType ? getSource(sourceType) : null;
 }
 
 /** 伞形解析失败（族内无人认领）：路由捕获后转 400 可行动报错 */

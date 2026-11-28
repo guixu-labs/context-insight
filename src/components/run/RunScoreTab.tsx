@@ -26,7 +26,7 @@ import { notifyError } from "@/components/NoticeHud";
 import { RunMemberPicker } from "@/components/run/RunMemberPicker";
 import { TrajectoryScoring } from "@/components/scoring/TrajectoryScoring";
 import { runMemberUrlFor } from "@/lib/observe/member-url";
-import { fallbackDownload } from "@/lib/observe/export-html";
+import { fallbackDownload } from "@/lib/observe/export-download";
 import { scoreExportFileName } from "@/lib/observe/score-export-name";
 import { isSoloRunId, soloTaskIdOf } from "@/lib/run/identity";
 import { buildMainAgentTurnMap, type TurnDigest } from "@/lib/shared/turn-digest";

@@ -13,7 +13,7 @@ LLM 编码 Agent 的 Session 级可观测工具：导入 agent 会话日志，�
 - **活跃 / 墙钟** — 会话详情 Wall Clock 拆分（活跃 + 非活跃 = 墙钟）与首页 Active / Wall 列：事件聚类口径（间隔 >5min 计非活跃、API 调用进行中计活跃）
 - **上下文治理** — 查看每轮 LLM 输入构成：可见消息 + 稳定 System 开销
 - **Subagent 追踪** — 识别子代理会话与 dispatch→response 链路，时间线内联展示
-- **Turn 播放器** — run 是一卷胶片：节点状态时间线压顶（状态段一览全程健康 + 活动节点加高锚定与标识簇 + 代际发丝分隔），代分组节点列表（成员会话懒加载、子代理泳道嵌套），选中轮进传输条播放器（胶片轨 + 跨节点连续走查）与 Δ 优先输入卡
+- **Turn 播放器** — run 是一卷胶片：执行时间线压顶（自 Perf 页迁入——真实时间轴上是成员各自的道与子代理槽位，点哪一刻即选中那一刻的轮次，iOS 风格的选中层跟随当前轮（实色时刻胶囊 + 以选中条为核的同色柔光 + 浮起的选中条，切轮平滑滑动；道内无竖向网格线）；缩放以选中区间或光标为锚、刻度只为可视窗口生成；尺子模式量两处时距），代分组节点列表（成员会话懒加载、子代理泳道嵌套），选中轮进传输条播放器（胶片轨 + 跨节点连续走查）与 Δ 优先输入卡
 - **Wire 轮次**（proxy 捕获）— 逐轮重组完整 wire 输入/输出，与 DB 重建对照；`-a` 启动显示
 - **system 行噪声治理**（proxy 捕获）— wire 的 system 组件无消息 id，捕获侧逐请求原样落盘：token 预算倒计时（`<total_tokens>N tokens left</total_tokens>`，纯 wire 簿记）随处剥除、剥后为空整行跳过；逐请求随行的静态注入按剥除后内容去重（同文首现保留一次）。真实系统事件（上下文告警、hook 注入、CLAUDE.md、日期/环境变更）全保留；wire 保真不受影响（回放 / 技能全集 / 全文上下文均读原始捕获，不经 Turn 表）；存量会话重导入即自愈（位次漂移触发全量替换）
 - **工具耗时保真**（proxy 捕获）— wire 历史重放不再覆盖首现 tool_result 载体行：completedAt 锚定真实完成时刻（首条载体），工具时长不再被后续请求的历史重放撑到小时级（真机现场：42ms 的 Bash 被记成 50653.9s）；重放行不产生额外轮次；存量会话重导入即自愈
@@ -81,7 +81,7 @@ context-insight            # 首次：自动 build + migrate（约 30s-2min）�
 - Codex: `~/.codex/sessions/`（rollout 文件；子代理会话自动并入主会话）
 - DSH: `~/.dsh/sessions/`（`session.v4.jsonl` / `.jsonl.zstd`；子代理会话自动并入主会话）
 
-Web UI 还支持：导出 session 为独立 SQLite 或 Markdown，以及从 run 工作台页头导出完全离线可交互的 HTML bundle（内嵌真实 run 工作台——solo 与多成员 run 均可导出）。LLM 接入面板内置常见提供商 Base URL 速查。
+Web UI 还支持：从 run 工作台页头把 run 导出为独立、可原样导回的 SQLite 文件（run 全员成员会话装进同一份文件——solo 会话为 `context_session_<taskId>.db`，多成员 run 为 `context_session_run_<name>.db`，与 `ctxi export` 命令产出同一份文件）、把 run 的原始文件按原格式打包为 zip（含子代理文件，与盘上字节一致；本机已无原文件的会话——含 opencode 的共享库——改以 7z 压缩的 SQLite 导出件代替，包内 `export-manifest.json` 逐会话记明；`ctxi export --archive`）、导出 session 为 Markdown，以及从 run 工作台页头导出完全离线可交互的 HTML bundle（内嵌真实 run 工作台——solo 与多成员 run 均可导出）。四种导出收在 run 工作台页头的同一个「导出」菜单里。LLM 接入面板内置常见提供商 Base URL 速查。
 
 ### 方式二：CLI 导入 + Web 分析
 

@@ -16,6 +16,7 @@ import type { ObserveScope } from '@/lib/observe/scope';
 import { memberByRowId, memberByTaskId } from '@/lib/observe/scope';
 import { buildAgentSpans, agentSpanKey } from '@/lib/observe/agent-spans';
 import { isProxyVersion } from '@/lib/shared/session-format';
+import { isCommandTail } from '@/lib/shared/command-parser';
 import { fetchContentHeads } from '@/lib/observe/collectors/content-heads';
 
 export interface CollectExecutionsOptions {
@@ -51,10 +52,13 @@ export async function collectScopeExecutions(
   // 泳道数据（run 级 agent 全景）：每个 agent 的 turns 跨度 + 原始活跃区间
   // （算法在 lib/observe/agent-spans，与 session 详情同源）与首条用户提示
   // （泳道悬停）。proxy 判定按成员会话行（run 级成员可能混布 proxy/native）。
+  // 区间逐轮带 turnId：Turns 顶部时间线把「点击的时刻」解析成轮次，不必再
+  // 拉全量轮次在客户端扫描；命令附注轮（列表无行）标 hidden，不作跳转目标。
+  // contentSummary 只在服务端参与 hidden 判定，不进响应
   const [turnTimes, userTurns, memberSessions] = await Promise.all([
     prisma.turn.findMany({
       where: { sessionId: { in: memberRowIds } },
-      select: { sessionId: true, isSubagent: true, subagentSessionId: true, createdAt_ts: true, completedAt: true, latencyMs: true },
+      select: { id: true, sessionId: true, isSubagent: true, subagentSessionId: true, createdAt_ts: true, completedAt: true, latencyMs: true, contentSummary: true },
     }),
     prisma.turn.findMany({
       where: { sessionId: { in: memberRowIds }, role: 'user' },
@@ -73,9 +77,16 @@ export async function collectScopeExecutions(
     : new Map<string, string>();
   const isProxyByRowId = new Map(memberSessions.map(s => [s.id, isProxyVersion(s.version)]));
   const spansBySession = new Map<string, ReturnType<typeof buildAgentSpans>>();
+  const turnTimesByRowId = new Map<string, typeof turnTimes>();
+  for (const t of turnTimes) {
+    const arr = turnTimesByRowId.get(t.sessionId) ?? [];
+    arr.push(t);
+    turnTimesByRowId.set(t.sessionId, arr);
+  }
   for (const rowId of memberRowIds) {
+    const rows = turnTimesByRowId.get(rowId) ?? [];
     spansBySession.set(rowId, buildAgentSpans(
-      turnTimes.filter(t => t.sessionId === rowId),
+      rows.map(t => ({ ...t, hidden: isCommandTail(t.contentSummary ?? '') })),
       isProxyByRowId.get(rowId) ?? false,
     ));
   }

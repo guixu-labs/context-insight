@@ -25,16 +25,31 @@
 //   混布，逐成员判定）。
 
 export interface AgentSpanTurn {
+  /** turn 行 id：随区间下发（activeIntervals[].turnId）——时间线把「点击的
+   *  时刻」解析成轮次靠它，缺省（只要跨度的调用方）不下发 */
+  id?: string
   isSubagent: boolean
   subagentSessionId: string | null
   createdAt_ts: Date | null
   completedAt: Date | null
   latencyMs: number
+  /** 该轮在轮次列表里没有行（命令 caveat / stdout 附注轮）：时间线不把它当
+   *  跳转目标——跳到一个列表里看不见的轮，选中态无处落地 */
+  hidden?: boolean
+}
+
+export interface AgentInterval {
+  start: number
+  end: number
+  inferred?: boolean
+  turnId?: string
+  hidden?: boolean
 }
 
 export interface AgentSpanEntry {
   span: { start: number; end: number } | null
-  activeIntervals: Array<{ start: number; end: number; inferred?: boolean }>
+  /** 按 start 升序（同 start 按 end 升序）——时刻 → 轮次的二分查找前提 */
+  activeIntervals: AgentInterval[]
 }
 
 // 身份键必须让 root 与任何 subagent 互不重叠：subagentSessionId 在 schema 里
@@ -48,7 +63,7 @@ export function agentSpanKey(isSubagent: boolean, agentSessionId: string | null)
 
 export function buildAgentSpans(turns: AgentSpanTurn[], isProxy: boolean): Map<string, AgentSpanEntry> {
   const spanByKey = new Map<string, { start: number; end: number }>()
-  const intervalsByKey = new Map<string, Array<{ start: number; end: number; inferred?: boolean }>>()
+  const intervalsByKey = new Map<string, AgentInterval[]>()
   for (const t of turns) {
     const key = agentSpanKey(t.isSubagent, t.subagentSessionId)
     const rawStart = t.createdAt_ts ?? t.completedAt
@@ -65,14 +80,14 @@ export function buildAgentSpans(turns: AgentSpanTurn[], isProxy: boolean): Map<s
     else { sp.start = Math.min(sp.start, start); sp.end = Math.max(sp.end, end) }
 
     const arr = intervalsByKey.get(key) ?? []
-    arr.push({ start: intervalStart, end, inferred })
+    arr.push({ start: intervalStart, end, inferred, turnId: t.id, hidden: t.hidden || undefined })
     intervalsByKey.set(key, arr)
   }
   const out = new Map<string, AgentSpanEntry>()
   for (const key of new Set([...spanByKey.keys(), ...intervalsByKey.keys()])) {
     out.set(key, {
       span: spanByKey.get(key) ?? null,
-      activeIntervals: intervalsByKey.get(key) ?? [],
+      activeIntervals: (intervalsByKey.get(key) ?? []).sort((a, b) => a.start - b.start || a.end - b.end),
     })
   }
   return out

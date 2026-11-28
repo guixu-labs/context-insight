@@ -9,29 +9,31 @@
 
 // Run Turns tab（design: run 级 Turns 变革——Run Player 架构；搜索驻留 =
 // Trace 退役后的跨成员搜索归位）。
-// 三层：① Run 轨（顶部）= 节点状态时间线——状态段 + 代际发丝分隔 + 活动
-// 节点加高锚定与标识簇 + 搜索胶囊（跨成员搜索 / #数字直达，命中索引驻留
-// 左列）；② 节点列表（左列）= 代分组 → 节点实例（成员会话懒加载，subagent
+// 三层：① 时间线（顶部，RunTurnsTimeline）= 真实时间轴上的 root 道 + 子代理
+// 槽位——单击任一时刻即选中该刻的轮次（时刻 → 轮次在模型里二分解析，不取
+// 数），播放头跟随选中轮；搜索胶囊与工具条同住一行（跨成员搜索 / #数字直达，
+// 命中索引驻留左列）；② 节点列表（左列）= 代分组 → 节点实例（成员会话懒加载，subagent
 // 泳道嵌套照旧），搜索驻留期间让位为命中索引；③ Turn Player（右列）=
 // 传输条 + 本会话胶片轨 + 三联指标 + 叙事舞台（TurnDetail，携带搜索高亮）。
 // 选中轮的节点归属由 turn 详情的 taskId 单点解析（深链/跨 tab 同路）；
 // ←/→ 沿「节点 × 成员会话 × 轮次」全序列连续走查，越过节点边界自动加载。
 
-import { Fragment, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRunDataEpoch } from "@/lib/run/data-epoch";
 import { MessageSquareIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TurnDetail, type TurnDetailData } from "@/components/observe/TurnDetail";
 import { TurnDetailSkeleton } from "@/components/observe/TurnDetailSkeleton";
 import type { FilmstripTurn } from "@/components/observe/TurnFilmstrip";
-import { RunTurnsNodes, STATUS_DOT, type TurnsNode, type TurnsNodeSession, type MemberTurnsState, type TurnsBlockTurn } from "@/components/run/RunTurnsNodes";
+import { RunTurnsNodes, type TurnsNode, type TurnsNodeSession, type MemberTurnsState, type TurnsBlockTurn } from "@/components/run/RunTurnsNodes";
 import { RunTurnsRoleFilter, deriveRoleOptions, toggleRoleFilter } from "@/components/run/RunTurnsRoleFilter";
 import { TurnSearchField, TurnHitsPanel, useTurnsHitsFilter, type TurnsSearchState, type TurnJumpOutcome, type TurnJumpMatch } from "@/components/run/RunTurnsSearch";
 import type { TurnHighlight } from "@/lib/shared/highlight";
 import type { TurnSearchItem } from "@/lib/observe/collectors/search";
 import { parseTurnsQuery } from "@/lib/observe/collectors/turns-query";
-import type { MergedBridgeItem } from "@/lib/observe/collectors/bridges";
 import type { NodeInstance, RunViewModel } from "@/lib/run/view-model";
+import { RunTurnsTimeline } from "@/components/run/turns-timeline/RunTurnsTimeline";
+import { useRunTimeline } from "@/components/run/turns-timeline/use-run-timeline";
 import type { SessionRef } from "@/lib/run/model";
 
 /** 首页页容量：小页快出首屏（快路径），剩余走补拉链 */
@@ -163,7 +165,9 @@ export function RunTurnsTab({ runId, viewModel, turnId, onSelectTurn, searchQuer
    *  出现过的角色） */
   const loadedTurnsAll = useMemo(() => [...memberData.values()].flatMap(s => s.turns), [memberData]);
   const roleOptions = useMemo(() => deriveRoleOptions(loadedTurnsAll), [loadedTurnsAll]);
-  const [bridges, setBridges] = useState<MergedBridgeItem[]>([]);
+  /** 时间线三路取数（executions / bridges / lanes）：桥同时喂节点内的派发归组 */
+  const timeline = useRunTimeline(runId, dataEpoch);
+  const bridges = timeline.bridges;
   /** 跨成员搜索驻留态（null = 节点索引；非 null = 命中索引驻留左列） */
   const [search, setSearch] = useState<TurnsSearchState | null>(null);
   /** 角色多选筛选（左列节点列表视角；空集 = 全显）。搜索驻留时筛选条隐藏，
@@ -189,16 +193,6 @@ export function RunTurnsTab({ runId, viewModel, turnId, onSelectTurn, searchQuer
   /** 走查越过已加载边界时的待落地选择（目标会话加载完即选首/末轮） */
   const pendingWalk = useRef<{ taskId: string; dir: 1 | -1 } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
-
-  // 桥（run 全量一次，小载荷元数据；节点内按派发轮归组；数据纪元原地重取）
-  useEffect(() => {
-    let cancelled = false;
-    void fetch(`/api/observe/run/${encodeURIComponent(runId)}/bridges`)
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (!cancelled) setBridges(d?.items ?? []) })
-      .catch(() => { /* 桥不可用时泳道缺席，轮次不受影响 */ });
-    return () => { cancelled = true };
-  }, [runId, dataEpoch]);
 
   /** 成员轮次自动拉齐（两段式）：首页 PAGE_SIZE 快出首屏 → 剩余按 offset
    *  分块补拉到全集（块 ≤ REST_PAGE_SIZE，超出循环续拉）。补拉量随已载量
@@ -302,13 +296,6 @@ export function RunTurnsTab({ runId, viewModel, turnId, onSelectTurn, searchQuer
     if (fetchedPagesRef.current.has(`${taskId}:1`)) return;
     fetchMemberFirst(taskId);
   }, [fetchMemberFirst]);
-
-  /** Run 轨节点点击：只揭示不展开——节点块滚动到视野居中；展开仍由节点头
-   *  独占（定位与展开是两种意图，不捆绑触发，也不预取成员分页） */
-  const revealNode = useCallback((key: string) => {
-    const node = listRef.current?.querySelector(`[data-node="${key}"]`);
-    if (node) revealIntoView(listRef.current, node);
-  }, []);
 
   const toggleNode = useCallback((key: string) => {
     setToggledTurnsNodes(prev => (prev.has(key) ? prev : new Set(prev).add(key)));
@@ -554,14 +541,11 @@ export function RunTurnsTab({ runId, viewModel, turnId, onSelectTurn, searchQuer
     return t?.subagentType ?? shownDetail.subagentName ?? "subagent";
   }, [shownDetail, ownerTurnsSorted]);
 
-  // Run 轨：主图节点序列；活动节点 = 选中轮所属节点（标识簇 + 加高锚段）
-  const railNodes = useMemo(() => nodes.filter(c => c.depth === 0), [nodes]);
+  // 选中轮所属节点：驱动节点跟随选中自动展开
   const ownerNodeKey = useMemo(
     () => (ownerTaskId ? nodes.find(c => c.sessions.some(s => s.taskId === ownerTaskId))?.key ?? null : null),
     [nodes, ownerTaskId],
   );
-  const activeRailIdx = railNodes.findIndex(n => n.key === ownerNodeKey);
-  const activeRailNode = activeRailIdx >= 0 ? railNodes[activeRailIdx] : null;
 
   /** 生效展开集 = 用户展开 ∪ 选中轮所在节点（未点过的节点跟随选中自动展开——
    * 深链/跨节点走查的展开是渲染期派生，不落 effect 改状态） */
@@ -600,12 +584,11 @@ export function RunTurnsTab({ runId, viewModel, turnId, onSelectTurn, searchQuer
 
   // ── 跨成员搜索（Trace 退役，搜索归 Turns——命中索引驻留左列）──
   // 命中集是排查工作集：选中命中打开 player 后列表不消失；退出（✕ / Esc /
-  // 点 Run 轨 / 改词重搜）才回节点索引。选中轮的成员分页与节点展开照常由
+  // 点时间线 / 改词重搜）才回节点索引。选中轮的成员分页与节点展开照常由
   // 既有管线就位（详情归属 → ensureMemberTurns → effectiveExpanded）
   const [activeHitIdx, setActiveHitIdx] = useState(0);
   const [visitedHits, setVisitedHits] = useState<ReadonlySet<string>>(new Set());
   const [hitHighlight, setHitHighlight] = useState<TurnHighlight | null>(null);
-  const pendingNodeRevealRef = useRef<string | null>(null);
   // 桥接回应轮集合（来源过滤的「子agent返回」分类事实）
   const bridgeResponseTurnIds = useMemo(
     () => new Set(bridges.flatMap(b => (b.responseTurnId ? [b.responseTurnId] : []))),
@@ -703,75 +686,28 @@ export function RunTurnsTab({ runId, viewModel, turnId, onSelectTurn, searchQuer
     [runId, ownerTaskId],
   );
 
-  /** Run 轨点击：搜索驻留时先退出（命中索引让位），揭示意图滞后到列表回位 */
-  const onRailNodeClick = useCallback(
-    (key: string) => {
-      if (search) {
-        pendingNodeRevealRef.current = key;
-        exitSearch();
-        return;
-      }
-      revealNode(key);
+  /** 时间线单击：搜索驻留时先退出（命中索引让位、节点列表回位），再走统一
+   *  选中管线——换选挂起的揭示意图随列表回位落地 */
+  const onTimelineSelectTurn = useCallback(
+    (id: string) => {
+      if (search) exitSearch();
+      handleSelectTurn(id);
     },
-    [search, exitSearch, revealNode],
+    [search, exitSearch, handleSelectTurn],
   );
-
-  useEffect(() => {
-    if (search || !pendingNodeRevealRef.current) return;
-    const key = pendingNodeRevealRef.current;
-    pendingNodeRevealRef.current = null;
-    revealNode(key);
-  }, [search, revealNode]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-foreground/[0.07] bg-background shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-      {/* ① Run 轨（节点状态时间线）：状态段一览全程健康，单行容纳任意节点数
-          （等宽按钮排在 60 节点级 run 上会挤叠成团）；活动节点加高锚定 +
-          标识簇常驻（状态点 · 节点名 · 位置计数），节点详情进悬停提示 */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-foreground/[0.07] px-4 py-2">
-        {activeRailNode && (
-          <div data-rail-active className="flex min-w-0 shrink-0 items-center gap-1.5">
-            <span className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[activeRailNode.status] ?? "bg-foreground/25")} aria-hidden />
-            <span className="max-w-[200px] truncate text-xs font-medium text-foreground/85">{activeRailNode.label}</span>
-            <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">{activeRailIdx + 1}/{railNodes.length}</span>
-          </div>
-        )}
-        <div data-rail-track className="flex min-w-0 flex-1 items-center gap-[2px] overflow-hidden" role="tablist" aria-label="run 节点">
-          {railNodes.map((ch, i) => {
-            const prev = railNodes[i - 1];
-            const newGeneration = i > 0 && prev.generation !== ch.generation;
-            const isRollback = newGeneration && ch.generation > (prev?.generation ?? 0);
-            const isActive = ch.key === ownerNodeKey;
-            const turnTotal = ch.sessions.reduce((s, x) => s + x.ref.turns, 0);
-            const meta = ch.sessions.length > 0
-              ? `${turnTotal}t`
-              : ch.executionState === "not_run" ? "未运行"
-              : ch.taskType === "bash" ? "bash" : "—";
-            return (
-              <Fragment key={ch.key}>
-                {newGeneration && <span className="h-3 w-px shrink-0 bg-foreground/[0.15]" aria-hidden />}
-                <button
-                  type="button"
-                  className="group flex h-5 min-w-1 cursor-pointer flex-1 items-center"
-                  onClick={() => onRailNodeClick(ch.key)}
-                  title={`${ch.label}${ch.generation > 0 ? ` · g${ch.generation}` : ""}${isRollback ? " · 回滚后新代际" : ""} · ${meta} · ${ch.status}`}
-                >
-                  <span
-                    className={cn(
-                      "w-full rounded-full transition-[height,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
-                      isActive ? "h-2.5" : "h-1.5 opacity-75 group-hover:opacity-100",
-                      STATUS_DOT[ch.status] ?? "bg-foreground/25",
-                    )}
-                    aria-hidden
-                  />
-                </button>
-              </Fragment>
-            );
-          })}
-          {railNodes.length === 0 && (
-            <p className="px-1 py-2 text-xs text-muted-foreground">无可观测节点</p>
-          )}
-        </div>
+      {/* ① 时间线（压顶导航轨）：真实时间轴上 root 道 + 子代理槽位，单击任一
+          时刻即选中该刻的轮次，播放头跟随选中轮；搜索胶囊与工具条同住一行 */}
+      <RunTurnsTimeline
+        agents={timeline.agents}
+        bridges={bridges}
+        lanes={timeline.lanes}
+        lanesInferred={timeline.lanesInferred}
+        selectedTurnId={turnId}
+        onSelectTurn={onTimelineSelectTurn}
+      >
         <TurnSearchField
           state={search}
           hitCount={visibleHits.length}
@@ -790,7 +726,7 @@ export function RunTurnsTab({ runId, viewModel, turnId, onSelectTurn, searchQuer
             if (it) openHit(it);
           }}
         />
-      </div>
+      </RunTurnsTimeline>
 
       {/* ②③ 节点 + Player */}
       <div className="flex min-h-0 flex-1">

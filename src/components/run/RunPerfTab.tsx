@@ -34,7 +34,6 @@ export function RunPerfTab({ runId, timeSummary, onOpenTurn, onOpenSearch }: Run
       executions: `${base}/executions`,
       turns: `${base}/turns?page=1&pageSize=20000`,
       bridges: `${base}/bridges`,
-      lanes: `${base}/lanes`,
       toolStats: `${base}/tool-stats`,
     };
   }, [runId, dataEpoch]);

@@ -22,8 +22,14 @@ test.describe("Solo 会话视图", () => {
 
     // 与 run 同壳同默认（DEFAULT_RUN_TAB 单一源），tab 导航在场
     await run.expectTabActive("overview");
-    // Markdown 导出（solo 专属动作；图标钮走 title 语义锚点）
-    await expect(page.getByTitle("导出 Markdown")).toBeVisible();
+    // 导出收成一个菜单（页头一个图标钮）：打开后 Markdown（solo 专属条目）与
+    // SQLite / 原始文件 zip（全 run 形态可用）条目在场；下载旅程见 export-db /
+    // export-archive
+    await expect(run.exportTrigger()).toBeVisible();
+    await run.openExportMenu();
+    await expect(run.exportMenuItem("markdown")).toBeVisible();
+    await expect(run.exportMenuItem("sqlite")).toBeVisible();
+    await expect(run.exportMenuItem("archive")).toBeVisible();
   });
 
   test("solo 视图可切 Turns 与 Perf：会话级工具耗时卡照常渲染", async ({ page }) => {

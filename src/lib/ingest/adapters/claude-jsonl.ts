@@ -16,7 +16,7 @@ import { classifyUserInjection, staticInjectionBlockPredicateFor, stripTokenBudg
 import { isSkillInjectionText } from './injections/claude-code';
 import { isRolloutFileName } from './codex-naming';
 import { isDshSessionLogName } from '../dsh-bridge/native';
-import type { SubagentRef } from './contract';
+import type { SessionFileRef, SessionFileRole, SubagentRef } from './contract';
 import type { SessionListItem, RawInteraction, ToolCallInfo, TokenUsage, SubagentLinkageMaps } from '../../shared/types';
 import { normalizeToolResultPayload } from '../../tool-conventions';
 
@@ -560,7 +560,7 @@ function readSubagentMeta(filePath: string): {
   idSource: string | null;
 } | null {
   try {
-    const metaPath = filePath.replace(/\.jsonl(\.7z|\.gz)?$/, '.meta.json');
+    const metaPath = metaPathOf(filePath);
     if (!fs.existsSync(metaPath)) return null;
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')) as Record<string, unknown>;
     const xb = readEnvelopeWithLegacy(meta) as XLake | undefined;
@@ -580,6 +580,27 @@ function readSubagentMeta(filePath: string): {
   }
 }
 
+/** 捕获文件的伴随 meta 路径（x.jsonl / x.jsonl.7z / x.jsonl.gz → x.meta.json）。 */
+function metaPathOf(filePath: string): string {
+  return filePath.replace(/\.jsonl(\.7z|\.gz)?$/, '.meta.json');
+}
+
+/** 会话主文件的双形态解析：sourcePath 指向明文但盘上仅 .7z（或反之）时解析
+ *  到盘上真实存在的那一份；三种形态都不存在 → null。 */
+export function resolveCaptureFile(filePath: string): string | null {
+  if (fs.existsSync(filePath)) return filePath;
+  if (filePath.endsWith('.jsonl')) {
+    if (fs.existsSync(`${filePath}.7z`)) return `${filePath}.7z`;
+    if (fs.existsSync(`${filePath}.gz`)) return `${filePath}.gz`;
+    return null;
+  }
+  if (/\.jsonl\.(7z|gz)$/.test(filePath)) {
+    const plain = filePath.replace(/\.(7z|gz)$/, '');
+    if (fs.existsSync(plain)) return plain;
+  }
+  return null;
+}
+
 export function listSubagentSessions(dirPath: string, sessionId: string): ClaudeSubagentRef[] {
   // dirPath can be a file (e.g., /path/to/session.jsonl) or a directory.
   // Subagents live at <parentDir>/sessionId/subagents/
@@ -588,15 +609,7 @@ export function listSubagentSessions(dirPath: string, sessionId: string): Claude
   // 前缀重试一次，否则 subagent 全部漏并（0 turns）。
   // 双形态解析后再 stat：sourcePath 指向明文但盘上仅 .gz（或反之）时
   // statSync ENOENT 抛出会把导入整链炸成 500
-  let resolved = dirPath;
-  if (!fs.existsSync(resolved)) {
-    if (dirPath.endsWith('.jsonl')) {
-      if (fs.existsSync(`${dirPath}.7z`)) resolved = `${dirPath}.7z`;
-      else if (fs.existsSync(`${dirPath}.gz`)) resolved = `${dirPath}.gz`;
-    } else if (/\.jsonl\.(7z|gz)$/.test(dirPath) && fs.existsSync(dirPath.replace(/\.(7z|gz)$/, ''))) {
-      resolved = dirPath.replace(/\.(7z|gz)$/, '');
-    }
-  }
+  const resolved = resolveCaptureFile(dirPath) ?? dirPath;
   const isFile = fs.existsSync(resolved) && fs.statSync(resolved).isFile();
   const parentDir = isFile ? path.dirname(resolved) : resolved;
   let subagentsDir = path.join(parentDir, sessionId, 'subagents');
@@ -743,6 +756,28 @@ export function readSubagentInteractions(dirPath: string, sessionId: string): Ra
     result.push(...subInteractions);
   }
   return result;
+}
+
+// 会话原始文件集（SourceDescriptor.listSessionFiles 能力实现）：主文件双形态
+// 解析 + 伴随 meta + listSubagentSessions 发现的子代理文件及其 meta。发现规则
+// 与 readSubagents 同源（同一个 listSubagentSessions），文件保持盘上真实形态。
+export function listSessionFiles(dirPath: string, sessionId: string): SessionFileRef[] | null {
+  const main = resolveCaptureFile(dirPath);
+  // dirPath 是 sessions 根目录（列表导入）时没有「这一个会话的主文件」可指
+  if (!main || !fs.statSync(main).isFile()) return [];
+  const refs: SessionFileRef[] = [{ role: 'main', filePath: main, relPath: path.basename(main) }];
+  pushIfFile(refs, 'meta', metaPathOf(main), '');
+  for (const sub of listSubagentSessions(dirPath, sessionId)) {
+    refs.push({ role: 'subagent', filePath: sub.filePath, relPath: path.posix.join('subagents', path.basename(sub.filePath)) });
+    pushIfFile(refs, 'subagent-meta', metaPathOf(sub.filePath), 'subagents');
+  }
+  return refs;
+}
+
+function pushIfFile(refs: SessionFileRef[], role: SessionFileRole, filePath: string, dir: string): void {
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    refs.push({ role, filePath, relPath: path.posix.join(dir, path.basename(filePath)) });
+  }
 }
 
 function isValidISO(timestamp: string): boolean {

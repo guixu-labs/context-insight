@@ -34,6 +34,8 @@ import type { NodeInstance, RunView } from '@/lib/run/view-model';
 import { RunGraph } from '@/components/run/RunGraph';
 import { METRIC_EMPTY, RUN_COLORS, flowColor, statusColor } from '@/components/run/run-theme';
 import type { RunImportMeta } from '@/lib/run/run-store';
+import { toast } from 'sonner'
+import * as NoticeHud from '@/components/NoticeHud'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -184,9 +186,17 @@ async function renderOfflinePage() {
     const body = document.body.textContent ?? ''
     // 离线宿主：服务端协作动作全隐藏（刷新/导出/上传），工作台数据照常渲染
     expect(document.querySelector('button[title="立即刷新"]')).toBeNull()
+    expect(document.querySelector('button[title="导出 SQLite 数据库"]')).toBeNull()
     expect(document.querySelector('button[title="导出 Markdown"]')).toBeNull()
     expect(document.querySelector('button[title="导出离线 HTML"]')).toBeNull()
     expect([...document.querySelectorAll('button')].find(b => b.textContent?.includes('上传到'))).toBeUndefined()
+    // 页头在离线档案里照常是单行应用栏（返回 + 品牌 + tab 导航），右翼是
+    // 空的——它与左翼配平让 tab 条居中，只是没有任何动作
+    const header = document.querySelector('[data-run-header]') as HTMLElement
+    expect(header.querySelector('button[title="返回上一步"]')).toBeTruthy()
+    expect(header.querySelector('[data-run-tabbar]')).toBeTruthy()
+    expect(header.querySelector('[data-run-header-zone="actions"]')?.children.length).toBe(0)
+    expect(header.querySelector('[data-run-header-actions]')).toBeNull()
     expect(body).toContain('Context')
     expect(body).toContain('minidemo01')
     // 详情经内核静态档案应答（非原 fetch 直通）
@@ -201,6 +211,23 @@ afterEach(() => {
   root = null
   document.body.innerHTML = ''
 })
+
+/** 打开页头「导出」菜单（base-ui Menu 的触发器按指针序列开合，jsdom 下把
+ *  一次真实点击的事件序列补齐），等条目渲染出来。 */
+async function openExportMenu(): Promise<void> {
+  const trigger = document.querySelector('button[title="导出"]') as HTMLButtonElement
+  await act(async () => {
+    for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+      trigger.dispatchEvent(type.startsWith('pointer')
+        ? new PointerEvent(type, { bubbles: true, button: 0, pointerType: 'mouse' })
+        : new MouseEvent(type, { bubbles: true, button: 0 }))
+    }
+    await new Promise(r => setTimeout(r, 0))
+  })
+}
+
+const exportItems = (): HTMLElement[] => [...document.querySelectorAll('[data-run-export]')] as HTMLElement[]
+const exportItem = (id: string): HTMLElement => document.querySelector(`[data-run-export="${id}"]`) as HTMLElement
 
 describe('Run 详情页暗色工作台', () => {
   it('Overview 默认 tab：总览头（身份 + Σ指标瓦片）+ 结构/导入卡；Graph 切换走 URL 镜像', async () => {
@@ -605,21 +632,38 @@ describe('Run 详情页暗色工作台', () => {
     expect(document.body.textContent).toContain('Run 概览')
   })
 
-  it('加载态外壳：chrome 即时成型（返回/品牌）+ 导航/首卡三区骨架，旧站头退役', async () => {
+  it('加载态外壳：页头以真身作骨架（返回 + 品牌 + 禁用的真 tab 条 + 动作占位），内容区三区骨架，旧站头退役', async () => {
     // run 详情端点挂起（未决 Promise）——页面停留加载态
     const pending = new Promise<Response>(() => {})
     vi.stubGlobal('fetch', vi.fn(() => pending))
     try {
       await renderPage()
-      // chrome 即时成型：返回钮（导航行）+ 品牌区（链接回首页）+ 版本
-      expect(document.querySelector('button[title="返回上一步"]')).toBeTruthy()
-      expect(document.querySelector('a[href="/"]')).toBeTruthy()
+      const header = document.querySelector('[data-run-header]') as HTMLElement
+      expect(header).toBeTruthy()
+      // chrome 即时成型：返回钮（页头左段）+ 品牌区（链接回首页）+ 版本，均在页头内
+      const back = document.querySelector('button[title="返回上一步"]')
+      expect(back?.closest('[data-run-header]')).toBe(header)
+      const brand = document.querySelector('a[href="/"]')
+      expect(brand?.closest('[data-run-header-zone="leading"]')).toBeTruthy()
       const body = document.body.textContent ?? ''
       expect(body).toContain('Context')
       expect(body).toContain('v1.0')
+      // tab 条 = 就绪态同一渲染表（9 个默认 tab 的真标签），pending：全禁用、
+      // 点击不导航；数据到达只解除禁用，位置不动
+      const bar = header.querySelector('[data-run-tabbar]') as HTMLElement
+      expect(bar.getAttribute('data-pending')).toBe('true')
+      const tabBtns = [...bar.querySelectorAll('button')].map(b => b.textContent)
+      expect(tabBtns).toEqual(['Overview', 'Graph', 'Turns', 'Context', 'Audit', 'Perf', 'Skills', 'Files', 'Score'])
+      expect([...bar.querySelectorAll('button')].every(b => (b as HTMLButtonElement).disabled)).toBe(true)
+      const seqBefore = (window.history.state as { runNavSeq?: number })?.runNavSeq ?? 0
+      ;(bar.querySelectorAll('button')[5] as HTMLButtonElement).click()
+      expect((window.history.state as { runNavSeq?: number })?.runNavSeq ?? 0).toBe(seqBefore)
+      // 右区：动作要等 run 详情，先占位（无真实动作钮）
+      expect(header.querySelector('[data-run-header-zone="actions"]')?.getAttribute('aria-hidden')).toBe('true')
+      expect(document.querySelector('[data-run-header-actions]')).toBeNull()
       // 无障碍：sr-only 加载提示（role=status）
       expect(document.querySelector('[role="status"]')?.textContent).toContain('加载 Run')
-      // 骨架贴近落位：导航药丸 + 首卡三区（身份/元信息/瓦片）+ 泳道骨架
+      // 骨架贴近落位：首卡三区（身份/元信息/瓦片）+ 双列列表
       const pulses = document.querySelectorAll('.animate-pulse')
       expect(pulses.length).toBeGreaterThan(20)
       const grids = document.querySelectorAll('.divide-y')
@@ -631,7 +675,7 @@ describe('Run 详情页暗色工作台', () => {
     }
   })
 
-  it('错误态外壳：chrome + 居中错误卡（返回/重试），旧站头退役', async () => {
+  it('错误态外壳：页头仅品牌 + 居中错误卡（返回/重试），旧站头退役', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: false,
       status: 404,
@@ -639,8 +683,13 @@ describe('Run 详情页暗色工作台', () => {
     })))
     try {
       await renderPage()
-      // chrome 可用：品牌区（顶栏不再放返回钮——错误卡自带返回/重试）
-      expect(document.querySelector('a[href="/"]')).toBeTruthy()
+      // 页头只有品牌区（错误卡自带返回/重试——页头不再放返回钮，也没有可
+      // 导航的 tab 与可用的动作）
+      const header = document.querySelector('[data-run-header]') as HTMLElement
+      expect(header.querySelector('a[href="/"]')).toBeTruthy()
+      expect(header.querySelector('button')).toBeNull()
+      expect(header.querySelector('[data-run-tabbar]')).toBeNull()
+      expect(header.querySelector('[data-run-header-actions]')).toBeNull()
       // 错误卡：错误文案 + 返回/重试
       const body = document.body.textContent ?? ''
       expect(body).toContain('Run not found: minidemo01')
@@ -652,10 +701,37 @@ describe('Run 详情页暗色工作台', () => {
     }
   })
 
-  it('全局 chrome 单行导航 + Overview 首卡身份：品牌区 + 动作簇在导航栏，run 身份在首卡', async () => {
+  it('页头单行应用栏：返回 · 品牌 → tab 导航（居中）→ 动作簇，三段同属一个页头，tab 导航不再是独立一行', async () => {
+    await renderPage()
+    const headers = document.querySelectorAll('[data-run-header]')
+    expect(headers.length).toBe(1)
+    const header = headers[0] as HTMLElement
+    // 三段按 DOM 顺序排列：leading（返回 + 品牌）/ nav（tab 条，居页头正中）/
+    // actions（右翼，与左翼等权配平）
+    const zones = [...header.children].filter(el => el.hasAttribute('data-run-header-zone')).map(z => z.getAttribute('data-run-header-zone'))
+    expect(zones).toEqual(['leading', 'nav', 'actions'])
+    const back = document.querySelector('button[title="返回上一步"]') as HTMLButtonElement
+    const brand = document.querySelector('a[href="/"]') as HTMLAnchorElement
+    const bar = document.querySelector('[data-run-tabbar]') as HTMLElement
+    const upload = [...document.querySelectorAll('button')].find(b => b.textContent?.includes('上传到')) as HTMLButtonElement
+    expect(back.closest('[data-run-header-zone="leading"]')).toBeTruthy()
+    expect(brand.closest('[data-run-header-zone="leading"]')).toBeTruthy()
+    expect(bar.closest('[data-run-header-zone="nav"]')).toBeTruthy()
+    expect(upload.closest('[data-run-header-zone="actions"]')).toBeTruthy()
+    // 四者同一个页头——页头之外没有第二个导航行
+    for (const el of [back, brand, bar, upload]) expect(el.closest('[data-run-header]')).toBe(header)
+    expect(document.querySelectorAll('[data-run-tabbar]').length).toBe(1)
+    expect(document.querySelectorAll('button[title="返回上一步"]').length).toBe(1)
+    // 就绪态：tab 条不是 pending（可点、可导航）
+    expect(bar.hasAttribute('data-pending')).toBe(false)
+    await act(async () => { (bar.querySelectorAll('button')[5] as HTMLButtonElement).click() })
+    expect(document.querySelector('[data-run-tab="perf"]')?.className).toContain('flex')
+  })
+
+  it('页头动作区 + Overview 首卡身份：品牌区 + 动作簇在页头，run 身份在首卡', async () => {
     await renderPage()
     const body = document.body.textContent ?? ''
-    // 导航行：品牌区（渐变标 + 双色字标）+ 版本；无 run 名/runId（身份在首卡）
+    // 页头左段：品牌区（渐变标 + 双色字标）+ 版本；无 run 名/runId（身份在首卡）
     expect(body).toContain('Context')
     expect(body).toContain('Insight')
     expect(body).toContain('v1.0')
@@ -668,13 +744,117 @@ describe('Run 详情页暗色工作台', () => {
     expect(h1!.getAttribute('title')).toContain('minidemo01')
     expect(body).toContain('工作流')
     expect(body).toContain('minidemo01')
-    // 动作簇：刷新图标钮（title=立即刷新）+ 上传实心药丸；bundle 形态 HTML
-    // 导出全 run 可用（工作台即离线查看器），MD 导出仍 solo 专属
+    // 动作簇：刷新图标钮（title=立即刷新）+ 上传实心药丸；bundle 形态 SQLite
+    // 与 HTML 导出全 run 可用（SQLite = run 全员成员的独立导出件，HTML = 工作
+    // 台即离线查看器），MD 导出仍 solo 专属
     expect(document.querySelector('button[title="立即刷新"]')).toBeTruthy()
     const upload = [...document.querySelectorAll('button')].find(b => b.textContent?.includes('上传到'))
     expect(upload).toBeTruthy()
-    expect(document.querySelector('button[title="导出 Markdown"]')).toBeNull()
-    expect(document.querySelector('button[title="导出离线 HTML"]')).toBeTruthy()
+    // 导出收成一个菜单（一个图标钮）：条目打开后才渲染——SQLite / 原始文件
+    // zip / 离线 HTML 全 run 可用，Markdown solo 专属不在场；次序即上面的次序
+    const cluster = [...document.querySelectorAll('[data-run-header-actions] button')].map(b => b.getAttribute('title'))
+    expect(cluster.filter(t => t?.startsWith('导出'))).toEqual(['导出'])
+    const exportTrigger = document.querySelector('button[title="导出"]') as HTMLButtonElement
+    expect(exportTrigger.disabled).toBe(false)
+    await openExportMenu()
+    expect(exportItems().map(el => el.getAttribute('data-run-export'))).toEqual(['sqlite', 'archive', 'html'])
+  })
+
+  it('页头「导出」菜单：条目只有标题一行（不挂副标题），打开菜单不额外发请求', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return { ok: true, json: async () => responseBody } as unknown as Response;
+    }));
+    try {
+      await renderPage();
+      calls.length = 0;
+      await openExportMenu();
+      // 菜单是静态入口：开合不触发任何取数（归档计划由服务端在导出时现算）
+      expect(calls).toEqual([]);
+      expect(exportItems().map(el => el.textContent)).toEqual(['SQLite 数据库', '原始文件 (zip)', '离线 HTML']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  })
+
+  it('页头「导出」→「SQLite 数据库」：点击 → GET run 级 export-db → 按响应头文件名落盘，进行中禁用', async () => {
+    const toastSuccess = vi.spyOn(toast, 'success')
+    const notifyErrorSpy = vi.spyOn(NoticeHud, 'notifyError')
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    const exportFetch = vi.fn(async (input: RequestInfo | URL) => {
+      if (!String(input).endsWith('/export-db')) {
+        return { ok: true, json: async () => responseBody } as unknown as Response
+      }
+      await gate
+      return {
+        ok: true,
+        headers: { get: () => 'attachment; filename="context_session_run_mini-bundle.db"' },
+        arrayBuffer: async () => new ArrayBuffer(32),
+      } as unknown as Response
+    })
+    vi.stubGlobal('fetch', exportFetch)
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    URL.createObjectURL = vi.fn(() => 'blob:sqlite-export') as never
+    URL.revokeObjectURL = vi.fn() as never
+    try {
+      await renderPage()
+      await openExportMenu()
+      const button = document.querySelector('button[title="导出"]') as HTMLButtonElement
+      await act(async () => { exportItem('sqlite').click() })
+      // 取流期间：导出钮禁用（防重复触发），尚未落盘、尚未提示
+      expect(button.disabled).toBe(true)
+      expect(anchorClick).not.toHaveBeenCalled()
+      expect(toastSuccess).not.toHaveBeenCalled()
+
+      await act(async () => { release() })
+      // run 级端点（runId 随 run 身份，不带成员 / taskId——全员由服务端 scope 决定）
+      // run 级端点（runId 随 run 身份，不带成员 / taskId——全员由服务端 scope 决定）
+      expect(exportFetch.mock.calls.map(c => String(c[0]))).toEqual([
+        expect.stringContaining('/api/observe/run/minidemo01'),
+        '/api/observe/run/minidemo01/export-db',
+      ])
+      expect(anchorClick).toHaveBeenCalledTimes(1)
+      const anchor = anchorClick.mock.instances[0] as unknown as HTMLAnchorElement
+      expect(anchor.download).toBe('context_session_run_mini-bundle.db')
+      expect(button.disabled).toBe(false)
+      expect(toastSuccess).toHaveBeenCalledTimes(1)
+      expect(toastSuccess.mock.calls[0][0]).toBe('SQLite exported')
+      expect(notifyErrorSpy).not.toHaveBeenCalled()
+    } finally {
+      anchorClick.mockRestore()
+      toastSuccess.mockRestore()
+      notifyErrorSpy.mockRestore()
+    }
+  })
+
+  it('页头「导出」→「SQLite 数据库」：服务端报错 → 报错确认卡带原因，不落盘、不提示成功', async () => {
+    const toastSuccess = vi.spyOn(toast, 'success')
+    const notifyErrorSpy = vi.spyOn(NoticeHud, 'notifyError')
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (!String(input).endsWith('/export-db')) {
+        return { ok: true, json: async () => responseBody } as unknown as Response
+      }
+      return { ok: false, status: 500, json: async () => ({ error: 'Session not found: 1 of 3 rows' }) } as unknown as Response
+    }))
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    try {
+      await renderPage()
+      await openExportMenu()
+      const button = document.querySelector('button[title="导出"]') as HTMLButtonElement
+      await act(async () => { exportItem('sqlite').click() })
+      await act(async () => { await new Promise(r => setTimeout(r, 0)) })
+      expect(anchorClick).not.toHaveBeenCalled()
+      expect(toastSuccess).not.toHaveBeenCalled()
+      expect(notifyErrorSpy).toHaveBeenCalledTimes(1)
+      expect(notifyErrorSpy.mock.calls[0]).toEqual(['Export SQLite failed', 'Session not found: 1 of 3 rows'])
+      expect(button.disabled).toBe(false)
+    } finally {
+      anchorClick.mockRestore()
+      toastSuccess.mockRestore()
+      notifyErrorSpy.mockRestore()
+    }
   })
 
   it('离线宿主（导出 HTML 形态）：服务端协作动作全隐藏，工作台经内核档案照常渲染', async () => {

@@ -27,6 +27,7 @@ import {
   readSession,
   readSubagentInteractions,
   listSubagentRolloutFiles,
+  listSessionFiles,
   extractVersion,
 } from '@/lib/ingest/adapters/codex-jsonl';
 import {
@@ -293,6 +294,22 @@ describe('codex-jsonl 子代理发现（spawn 输出 + parent_thread_id 交叉�
     // 昵称（实例名）与角色（类型分组维度）分通道——类型通道喂昵称会把
     // 泳道/关系图按类型分组拆成一人一组（type=averroes 回归锁）
     expect(euclid.every(s => s.subagent_type !== s.subagent_name)).toBe(true);
+  });
+
+  it('listSessionFiles：主 rollout + 子代理 rollout（subagents/ 下、文件名保持原名）；与 readSubagents 同一发现；主文件缺失 → []', () => {
+    const refs = listSessionFiles(mainFile, MAIN)!;
+    const byPath = (list: typeof refs) => [...list].sort((a, b) => a.filePath.localeCompare(b.filePath));
+    expect(byPath(refs).map(r => [r.role, r.filePath, r.relPath])).toEqual([
+      ['main', mainFile, path.basename(mainFile)],
+      ['subagent', sub1File, `subagents/${path.basename(sub1File)}`],
+      ['subagent', sub2File, `subagents/${path.basename(sub2File)}`],
+    ]);
+    // 发现与 readSubagents 同源：文件集里的子代理 = 读出来的子代理（去重）
+    const readIds = new Set(readSubagentInteractions(mainFile, MAIN).map(s => s.subagent_session_id));
+    expect(refs.filter(r => r.role === 'subagent')).toHaveLength(readIds.size);
+    // 目录路径（UI「列表选择→导入」）与文件路径同一结果
+    expect(byPath(listSessionFiles(DATA, MAIN)!)).toEqual(byPath(refs));
+    expect(listSessionFiles(path.join(os.tmpdir(), 'no-such-rollout.jsonl'), MAIN)).toEqual([]);
   });
 
   it('listSubagentRolloutFiles：parent_thread_id 不匹配的文件不进入上传集合', () => {

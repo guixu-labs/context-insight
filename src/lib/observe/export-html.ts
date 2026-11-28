@@ -13,6 +13,7 @@
 // src/export-view/offline-kernel.ts）。对账结果（sessionStorage）迁移为
 // 全局，挂载即读。
 
+import { HTML_FILE, saveBlob } from "@/lib/observe/export-download";
 import { BRAND_NAME } from "@/lib/branding"
 import { runMemberRowsOf, type RunMemberRow } from "@/lib/run/member-rows"
 import { runMemberUrlFor } from "@/lib/observe/member-url"
@@ -206,35 +207,5 @@ window.__EXPORT_AUDITS = ${auditsJson};
 }
 
 export function downloadHtml(html: string, filename: string): void {
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" })
-  const opts = {
-    suggestedName: filename,
-    types: [{ description: "HTML", accept: { "text/html": [".html"] } }],
-  }
-  const w = window as unknown as {
-    showSaveFilePicker?: (o: typeof opts) => Promise<{ createWritable: () => Promise<{ write: (d: Blob) => Promise<void>; close: () => Promise<void> }> }>
-  }
-  if (typeof w.showSaveFilePicker === "function") {
-    w.showSaveFilePicker(opts).then(async (handle) => {
-      const writable = await handle.createWritable()
-      await writable.write(blob)
-      await writable.close()
-    }).catch((e: unknown) => {
-      if (e instanceof DOMException && e.name === "AbortError") return
-      fallbackDownload(blob, filename)
-    })
-    return
-  }
-  fallbackDownload(blob, filename)
-}
-
-export function fallbackDownload(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  setTimeout(() => URL.revokeObjectURL(url), 15000)
+  saveBlob(new Blob([html], { type: "text/html;charset=utf-8" }), filename, HTML_FILE)
 }

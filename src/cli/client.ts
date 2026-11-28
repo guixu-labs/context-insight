@@ -32,6 +32,8 @@ import type {
 } from './types';
 import { soloRunIdOf } from '@/lib/run/identity';
 import fs from 'node:fs';
+import { Readable } from 'node:stream';
+import { pipeline as pipelineAsync } from 'node:stream/promises';
 
 export interface ClientConfig {
   baseUrl: string;
@@ -254,36 +256,44 @@ export class InsightClient {
     });
   }
 
+  // Exports a session to a standalone SQLite database. Same endpoint as the run
+  // workbench's "export SQLite" action (run member scope), so the file is
+  // byte-equivalent to what the web UI downloads and re-imports as-is.
   async exportSession(taskId: string, outputPath: string): Promise<{ size: number }> {
-    const url = new URL('/api/ingest/export-session', this.config.baseUrl);
-    const init: RequestInit = {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(this.config.authToken ? { Authorization: `Bearer ${this.config.authToken}` } : {}),
-      },
-      body: JSON.stringify({ taskId }),
-      signal: AbortSignal.timeout(60000),
-    };
+    return this.downloadToFile(taskId, 'export-db', outputPath, 120000);
+  }
 
+  // Exports a session's original source files as a zip. Same endpoint as the run
+  // workbench's "export original files" action; sessions whose originals are no
+  // longer on disk are shipped as the 7z-compressed SQLite export instead.
+  async exportSessionArchive(taskId: string, outputPath: string): Promise<{ size: number }> {
+    // 归档可过 GB：流式落盘（不整包进内存），时限按大件放宽
+    return this.downloadToFile(taskId, 'export-archive', outputPath, 1800000);
+  }
+
+  // GET 一个 run 级文件端点并流式落盘（不整包进内存）。失败抛 ApiError。
+  private async downloadToFile(taskId: string, endpoint: string, outputPath: string, timeoutMs: number): Promise<{ size: number }> {
+    const url = new URL(`/api/observe/run/${encodeURIComponent(soloRunIdOf(taskId))}/${endpoint}`, this.config.baseUrl);
+    const init: RequestInit = {
+      method: 'GET',
+      headers: this.config.authToken ? { Authorization: `Bearer ${this.config.authToken}` } : {},
+      signal: AbortSignal.timeout(timeoutMs),
+    };
     const res = await fetch(url.toString(), init);
     if (!res.ok) {
       const errorBody = await res.text();
       let errorMessage: string;
       try {
-        const parsed = JSON.parse(errorBody);
-        errorMessage = parsed.error ?? errorBody;
+        errorMessage = (JSON.parse(errorBody) as { error?: string }).error ?? errorBody;
       } catch {
         errorMessage = errorBody;
       }
       throw new ApiError(res.status, errorMessage, res.status >= 500);
     }
+    if (!res.body) throw new ApiError(res.status, 'Empty response body', true);
 
-    const arrayBuffer = await res.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    fs.writeFileSync(outputPath, buffer);
-
-    return { size: buffer.length };
+    await pipelineAsync(Readable.fromWeb(res.body as import('node:stream/web').ReadableStream<Uint8Array>), fs.createWriteStream(outputPath));
+    return { size: fs.statSync(outputPath).size };
   }
 
   async uploadSession(taskId: string, description: string, category?: string, baseline?: boolean, framework?: string, withNative?: boolean): Promise<ApiUploadResponse> {

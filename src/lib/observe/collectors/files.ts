@@ -291,7 +291,7 @@ export async function buildDirRestoreForRows(prisma: PrismaClient, rowIds: strin
     entries.push({ path, data: encoder.encode(renderRestoredText(lines)) });
   }
 
-  const blob = buildZip(entries);
+  const blob = await buildZip(entries);
   const buf = Buffer.from(await blob.arrayBuffer());
   return { buf, count: entries.length, totalLines, gapLines };
 }

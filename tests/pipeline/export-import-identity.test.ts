@@ -21,7 +21,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { exportSession } from '../../src/lib/ingest/export-service.ts';
+import { exportSession, exportSessionRows } from '../../src/lib/ingest/export-service.ts';
 import { importSession, deltaRefreshSession } from '../../src/lib/ingest/data-service.ts';
 import { listSessions, detectContent } from '../../src/lib/ingest/adapters/context-insight.ts';
 
@@ -55,7 +55,11 @@ function artifactPath(taskId: string): string {
   return path.join(tmpDir, `context_session_${taskId}.db`);
 }
 
-const TASK_IDS = ['it-expid-proxy', 'it-expid-native', 'it-expid-merge', 'it-expid-refresh'];
+const TASK_IDS = [
+  'it-expid-proxy', 'it-expid-native', 'it-expid-merge', 'it-expid-refresh',
+  // run 作用域一杆多行（工作台「导出 SQLite」）的三个成员
+  'it-expid-member-a', 'it-expid-member-b', 'it-expid-member-c',
+];
 
 afterAll(async () => {
   for (const taskId of TASK_IDS) {
@@ -161,5 +165,77 @@ describe('E2E: DB 导出→再导入的会话身份保持', () => {
 
     const r = await deltaRefreshSession(taskId, prisma);
     expect(r.addedTurns).toBe(1);
+  });
+});
+
+describe('run 作用域一杆多行：工作台「导出 SQLite」→ 再导入', () => {
+  const A = 'it-expid-member-a';
+  const B = 'it-expid-member-b';
+  const C = 'it-expid-member-c';
+  const artifact = path.join(tmpDir, 'context_session_run_members.db');
+
+  it('三行成员（记录类各异、其中一行零轮次）写进同一导出件：写入序 = 调用序，派生行各归各', async () => {
+    await seedSession(A, 'claude-code-proxy', '2.1.278-proxy');
+    await seedSession(B, 'codex', '0.162.0');
+    // 零轮次成员：bundle 里被引用但没跑起来的会话行也要原样带出
+    await prisma.session.create({
+      data: { taskId: C, label: `label of ${C}`, framework: 'opencode', startTime: new Date('2026-10-01T10:00:00.000Z') },
+    });
+    const rows = await prisma.session.findMany({ where: { taskId: { in: [A, B, C] } }, select: { id: true, taskId: true } });
+    const idOf = (taskId: string) => rows.find(r => r.taskId === taskId)!.id;
+    const callOrder = [C, A, B].map(idOf);
+
+    const summary = await exportSessionRows(callOrder, artifact, prisma);
+    expect(summary).toMatchObject({ path: artifact, sessions: 3, turns: 4, toolCalls: 0, skillEvents: 0, executions: 0, bridges: 0 });
+
+    const db = new Database(artifact, { readonly: true });
+    try {
+      expect((db.prepare('SELECT value FROM "ExportMeta" WHERE key = ?').get('producer') as { value: string }).value).toBe('insight-export');
+      const sessionIds = (db.prepare('SELECT id FROM "Session" ORDER BY rowid').all() as { id: string }[]).map(r => r.id);
+      expect(sessionIds).toEqual(callOrder);
+      const turnsOf = (sessionId: string) =>
+        (db.prepare('SELECT COUNT(*) AS n FROM "Turn" WHERE sessionId = ?').get(sessionId) as { n: number }).n;
+      expect(turnsOf(idOf(A))).toBe(2);
+      expect(turnsOf(idOf(B))).toBe(2);
+      expect(turnsOf(idOf(C))).toBe(0);
+      // 外键完整性：没有孤儿派生行（导出只按成员行取派生行，不波及库内其它会话）
+      expect((db.prepare('SELECT COUNT(*) AS n FROM "Turn"').get() as { n: number }).n).toBe(4);
+    } finally {
+      db.close();
+    }
+
+    // 再导入 = 「导入到另一实例」：删原行后逐会话导回，有轮次的两行身份
+    // （记录类 / 版本）原样；零轮次成员按导入管线既有口径不落行（回收站恢复
+    // 同款——importSession 要求至少一轮交互）
+    await prisma.session.deleteMany({ where: { taskId: { in: [A, B, C] } } });
+    for (const taskId of [A, B]) {
+      const res = await importSession(artifact, taskId, prisma, artifact, 'context-insight');
+      expect(res.imported).toBe(true);
+    }
+    expect((await importSession(artifact, C, prisma, artifact, 'context-insight')).imported).toBe(false);
+    const restored = await prisma.session.findMany({ where: { taskId: { in: [A, B, C] } } });
+    const byTask = new Map(restored.map(r => [r.taskId, r]));
+    expect([byTask.get(A)?.framework, byTask.get(A)?.version]).toEqual(['claude-code-proxy', '2.1.278-proxy']);
+    expect([byTask.get(B)?.framework, byTask.get(B)?.version]).toEqual(['codex', '0.162.0']);
+    expect(restored.map(r => r.taskId).sort()).toEqual([A, B].sort());
+  });
+
+  it('导入预览列全三行，记录类逐会话给（不被容器身份冒充）', () => {
+    const listed = listSessions(artifact);
+    expect(listed.map(s => s.id).sort()).toEqual([A, B, C].sort());
+    const frameworkOf = (taskId: string) => listed.find(s => s.id === taskId)?.framework;
+    expect([frameworkOf(A), frameworkOf(B), frameworkOf(C)]).toEqual(['claude-code-proxy', 'codex', 'opencode']);
+  });
+
+  it('任一行缺失整体失败：不产出导出件、不留临时残骸、不覆盖同路径旧件', async () => {
+    const real = await prisma.session.findFirstOrThrow({ where: { taskId: A }, select: { id: true } });
+    const target = path.join(tmpDir, 'it-expid-members-missing.db');
+    fs.writeFileSync(target, 'previous-snapshot');
+
+    await expect(exportSessionRows([real.id, 'row-does-not-exist'], target, prisma)).rejects.toThrow('Session not found: 1 of 2 rows');
+    expect(fs.readFileSync(target, 'utf-8')).toBe('previous-snapshot');
+    expect(fs.readdirSync(tmpDir).filter(name => name.startsWith('it-expid-members-missing.db.tmp-'))).toEqual([]);
+
+    await expect(exportSessionRows([], target, prisma)).rejects.toThrow('No session rows to export');
   });
 });

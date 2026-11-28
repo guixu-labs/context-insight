@@ -56,6 +56,13 @@ export function isCommandStdout(text: string): boolean {
   return COMMAND_PATTERNS.localStdout.test(text)
 }
 
+/** 命令附注行（caveat / stdout）：依附于命令轮、不独立成行——轮次列表的
+ *  行可见性与时间线的跳转目标同用这一把尺子（跳到一个列表里没有行的轮，
+ *  选中态无处落地） */
+export function isCommandTail(text: string): boolean {
+  return isCommandCaveat(text) || isCommandStdout(text)
+}
+
 export function isAnyCommandRelated(text: string): boolean {
   return isCommandTurn(text) || isCommandCaveat(text) || isCommandStdout(text)
 }

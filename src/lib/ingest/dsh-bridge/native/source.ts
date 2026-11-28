@@ -8,6 +8,7 @@
 
 import fs from 'node:fs';
 import { truncateUtf16Safe } from '../../../shared/text-strip';
+import type { SessionFileRef as ContractSessionFileRef } from '../../adapters/contract';
 import path from 'node:path';
 import type { RawInteraction, SessionListItem } from '@/lib/shared/types';
 import { decodeDshLogFile } from '../core';
@@ -234,10 +235,10 @@ function subagentDescriptor(events: DshEvent[]): { name: string | null; type: st
   return { name: null, type: null };
 }
 
-/** 发现并读取子代理会话（header.parentSession 建链，递归含嵌套孙代理），
- *  产出统一打标（subagent_session_id/name/type）的 interactions。
- *  父代理转发消息（user/message kind='agent-message'）随子会话一并转换。 */
-export function readSubagentInteractions(dbPath: string, sessionId: string): RawInteraction[] {
+/** 子代理会话树发现（header.parentSession 建链，递归含嵌套孙代理）：返回
+ *  按发现序（先子后孙）排列的已解码子会话，不含父会话自身。读取
+ *  （readSubagentInteractions）与文件集列举（listSessionFiles）共用。 */
+function discoverSubagentSessions(dbPath: string, sessionId: string): DecodedSession[] {
   // 只扫描父会话所在目录（= 含全部同级 <sid>/ 的那个目录）：原生布局里子代理是
   // 同 encoded-cwd 下的兄弟目录，导出布局里子代理在 <sid>/subagents/ 下——两者
   // 都在该目录内。避免对 sessions 根做全量解码（O(N) → O(同 cwd 会话数)）。
@@ -261,7 +262,7 @@ export function readSubagentInteractions(dbPath: string, sessionId: string): Raw
     }
   }
 
-  const result: RawInteraction[] = [];
+  const found: DecodedSession[] = [];
   const visited = new Set<string>();
   const walk = (parentId: string, depth: number): void => {
     if (depth > 8) return; // 嵌套深度上限（防异常环）
@@ -269,20 +270,49 @@ export function readSubagentInteractions(dbPath: string, sessionId: string): Raw
       const childId = typeof child.header.id === 'string' ? child.header.id : child.ref.sessionId;
       if (visited.has(childId)) continue;
       visited.add(childId);
-
-      const descriptor = subagentDescriptor(child.events);
-      const converted = convertDshSession(child.header, child.events).interactions;
-      for (const interaction of converted) {
-        interaction.subagent_session_id = childId;
-        if (descriptor.name) interaction.subagent_name = descriptor.name;
-        if (descriptor.type) interaction.subagent_type = descriptor.type;
-      }
-      result.push(...converted);
+      found.push(child);
       walk(childId, depth + 1);
     }
   };
   walk(sessionId, 0);
+  return found;
+}
+
+/** 发现并读取子代理会话，产出统一打标（subagent_session_id/name/type）的
+ *  interactions。父代理转发消息（user/message kind='agent-message'）随子会话
+ *  一并转换。 */
+export function readSubagentInteractions(dbPath: string, sessionId: string): RawInteraction[] {
+  const result: RawInteraction[] = [];
+  for (const child of discoverSubagentSessions(dbPath, sessionId)) {
+    const childId = typeof child.header.id === 'string' ? child.header.id : child.ref.sessionId;
+    const descriptor = subagentDescriptor(child.events);
+    const converted = convertDshSession(child.header, child.events).interactions;
+    for (const interaction of converted) {
+      interaction.subagent_session_id = childId;
+      if (descriptor.name) interaction.subagent_name = descriptor.name;
+      if (descriptor.type) interaction.subagent_type = descriptor.type;
+    }
+    result.push(...converted);
+  }
   return result;
+}
+
+/** 会话原始文件集（SourceDescriptor.listSessionFiles 能力实现）：主日志 +
+ *  子代理会话日志（原生布局下是同 encoded-cwd 的兄弟目录，导出布局下在
+ *  <sid>/subagents/），路径保持盘上真实形态（含 .zstd）。 */
+export function listSessionFiles(dbPath: string, sessionId: string): ContractSessionFileRef[] | null {
+  const main = resolveSessionFile(dbPath, sessionId);
+  if (!main) return [];
+  return [
+    { role: 'main', filePath: main, relPath: path.basename(main) },
+    // 子代理日志与主日志同名（固定代际名）：以日志所在目录名（= 会话 id 目录）
+    // 作 subagents/ 下的一层，既有层级不丢、互不重名
+    ...discoverSubagentSessions(dbPath, sessionId).map((child) => ({
+      role: 'subagent' as const,
+      filePath: child.ref.filePath,
+      relPath: path.posix.join('subagents', path.basename(path.dirname(child.ref.filePath)), path.basename(child.ref.filePath)),
+    })),
+  ];
 }
 
 /** 从会话头提取 DSH 版本号（Session.version 候选）。 */

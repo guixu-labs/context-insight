@@ -14,7 +14,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { listSessions, listOverview, materializeSession, uploadFolder, listParadigmDirs, ensureLfsBootstrapForRead, type LakeRemote, type LakeSessionEntry, type LakeOverview, type UploadResult, type RecordingClass } from './mirror';
 import { readCcSessionMeta } from '../ingest/proxy-classify';
-import { agentFrameworkOf, isProxyVersion } from '../shared/session-format';
+import { isProxyVersion } from '../shared/session-format';
 import { computeSessionActiveSplit } from '../active-time';
 import { defaultLakeRemote } from './remote';
 import { requirePushCredentials } from './auth';
@@ -25,7 +25,9 @@ import { readEnvelope, readEnvelopeWithLegacy, envelopeFields } from '../shared/
 import { readCaptureText, ensure7z, compressCaptureFile, decompressToPlain } from '@/lib/compression';
 import { importSession } from '@/lib/ingest/data-service';
 import { resolveSource, SourceResolutionError } from '@/lib/ingest/adapters/registry';
-import { listSubagentRolloutFiles as listCodexSubagentRolloutFiles } from '@/lib/ingest/adapters/codex-jsonl';
+import { sourceOfSessionRow } from '@/lib/ingest/adapters/registry';
+import { resolveSessionFiles } from '@/lib/ingest/session-files';
+import type { SessionFileRef } from '@/lib/ingest/adapters/contract';
 import {
   resolveNativeCounterpart,
   defaultNativeDiscoveryRoots,
@@ -219,11 +221,14 @@ export interface SessionRow {
 // bundle 成员上传 = manifest location）。直传优先（本机源文件字节保真），
 // 无源走 DB 导出兜底——bundle 上传（bundle.ts）复用同一装配，sessions/runs
 // 上传链路同源（数据集归一基础）。
-// - sourcePath 是本机存在的 jsonl（proxy 捕获 / native claude）：原文件直传，
-//   subagents 在 <dirname>/<fileSid>/subagents/（proxy 落盘约定）
-// - 其余一律 DB 导出兜底：opencode（无捕获文件）、v1 数据仓下载的 .db 快照
-//   会话（sourcePath 是 .db）、源文件已被删除/移动的会话。导出件不含
-//   Full Context（system/tools），管线数据齐全。
+// - 直传只认 claude / codex 两族 jsonl 源：原件是 claude 布局的 jsonl（proxy
+//   捕获 / native claude / codex rollout），装配成仓内 claude 布局——主文件
+//   归一成 <sid>.jsonl.7z、伴生 meta 归一成 <sid>.meta.json、子代理文件与
+//   其 meta 进 subagents/。文件集由源自己声明（SourceDescriptor.listSessionFiles，
+//   与导入时的子代理发现同源），本函数不再认目录布局。
+// - 其余一律 DB 导出兜底：opencode（共享库，无单会话原件）、DSH（zstd 原生
+//   日志，归一成 claude 布局无意义）、sourcePath 是 .db 的会话、源文件已被
+//   删除/移动的会话。导出件不含 Full Context（system/tools），管线数据齐全。
 export async function stageInsightSession(
   session: SessionRow,
   prisma: PrismaLike,
@@ -234,41 +239,25 @@ export async function stageInsightSession(
   const sessionDir = path.join(parentDir, dirName);
   fs.mkdirSync(sessionDir, { recursive: true });
 
-  // 原文件直传条件：sourcePath 是本机存在的 jsonl（明文/.7z/.gz）且非 native
-  // opencode（native opencode 的 sourcePath 是 .db / 目录约定）。proxy 捕获的
-  // opencode 会话（framework=opencode + version 带 -proxy）是 jsonl，直传。
-  // 源可以已是压缩态（cpx 退出即压，proxy/COMPRESSION-DESIGN.md）——staging
-  // 统一 ensure7z 出仓（存量 gz 源借此迁移到新格式）。
-  const sourceResolved = session.sourcePath
-    ? (fs.existsSync(session.sourcePath) ? session.sourcePath
-      : fs.existsSync(`${session.sourcePath}.7z`) ? `${session.sourcePath}.7z`
-      : fs.existsSync(`${session.sourcePath}.gz`) ? `${session.sourcePath}.gz` : null)
+  const sourceType = sourceOfSessionRow(session)?.sourceType;
+  const directUpload = (sourceType === 'claude-jsonl' || sourceType === 'codex-jsonl')
+    ? resolveSessionFiles(session)
     : null;
-  const hasJsonlSource = (session.framework !== 'opencode' || isProxyVersion(session.version))
-    && !!sourceResolved
-    && (sourceResolved.endsWith('.jsonl') || sourceResolved.endsWith('.jsonl.7z') || sourceResolved.endsWith('.jsonl.gz'));
-  if (hasJsonlSource) {
-    const srcExt = sourceResolved!.endsWith('.7z') ? '.jsonl.7z' : sourceResolved!.endsWith('.gz') ? '.jsonl.gz' : '.jsonl';
-    fs.copyFileSync(sourceResolved!, path.join(sessionDir, `${sid}${srcExt}`));
+  if (directUpload?.kind === 'originals') {
+    const refs = directUpload.refs;
+    const main = refs.find(ref => ref.role === 'main') as SessionFileRef;
+    // 源可以已是压缩态（cpx 退出即压，proxy/COMPRESSION-DESIGN.md）——staging
+    // 统一 ensure7z 出仓（存量 gz 源借此迁移到新格式）。
+    const srcExt = main.filePath.endsWith('.7z') ? '.jsonl.7z' : main.filePath.endsWith('.gz') ? '.jsonl.gz' : '.jsonl';
+    fs.copyFileSync(main.filePath, path.join(sessionDir, `${sid}${srcExt}`));
     ensure7z(path.join(sessionDir, `${sid}${srcExt}`));
-    // writer 落盘约定（writer.ts）：主捕获带 cpx- 前缀、伴生 meta 与子代理目录
-    // 用裸 sid。sourcePath 可能是任一形态（直捕 cpx-<sid>.jsonl[.7z|.gz]），
-    // 统一剥前缀/后缀后定位伴生文件。注意 basename 的后缀参数是逐字匹配——
-    // 先剥 .7z/.gz 再剥 .jsonl，不能一次传 '.jsonl.7z'。
-    const fileSid = path.basename(sourceResolved!.replace(/\.(7z|gz)$/, ''), '.jsonl').replace(/^cpx-/, '');
     // 主会话 meta（cc-session-meta，若存在）随行上传 —— 文件级 producer/framework 声明。
-    // 伴生 meta 命名随 writer 代际：旧代 = <sid>.meta.json（裸 sid）、现 writer =
-    // cpx-<sid>.meta.json（captureStem 带前缀）—— 双候选都试。
-    // 无伴生 meta（native claude 原文件）时从 DB 合成一份：producer='insight-upload'
+    // 无伴生 meta（native claude / codex 原文件）时从 DB 合成一份：producer='insight-upload'
     // 为展示专用值 —— 分类器只认 'cpx'、重导入 patch 只认 'insight-export'，
     // 故对导入行为零影响，仅让 list 的 type 列可见。
-    const metaCandidates = [
-      path.join(path.dirname(sourceResolved!), `${fileSid}.meta.json`),
-      path.join(path.dirname(sourceResolved!), `cpx-${fileSid}.meta.json`),
-    ];
-    const siblingMeta = metaCandidates.find(m => fs.existsSync(m));
-    if (siblingMeta) {
-      fs.copyFileSync(siblingMeta, path.join(sessionDir, `${sid}.meta.json`));
+    const meta = refs.find(ref => ref.role === 'meta');
+    if (meta) {
+      fs.copyFileSync(meta.filePath, path.join(sessionDir, `${sid}.meta.json`));
     } else {
       fs.writeFileSync(
         path.join(sessionDir, `${sid}.meta.json`),
@@ -282,30 +271,14 @@ export async function stageInsightSession(
         }, null, 2) + '\n',
       );
     }
-    // subagents 随行：裸 sid 目录（<proxy>/<sid>/subagents/，见上方 fileSid 注释）。
-    // 白名单拷贝：只带 .jsonl/.jsonl.7z/.jsonl.gz/.json —— 捕获目录里的杂散文件
-    // （.txt/.log/.env…）不清洗也不该出公开仓；拷入后 ensure7z 统一出仓形态
-    const subagentsDir = path.join(path.dirname(sourceResolved!), fileSid, 'subagents');
-    if (fs.existsSync(subagentsDir)) {
-      const dest = path.join(sessionDir, 'subagents');
-      fs.mkdirSync(dest, { recursive: true });
-      for (const entry of fs.readdirSync(subagentsDir, { withFileTypes: true })) {
-        if (entry.isFile() && (entry.name.endsWith('.jsonl') || entry.name.endsWith('.jsonl.7z') || entry.name.endsWith('.jsonl.gz') || entry.name.endsWith('.json'))) {
-          fs.copyFileSync(path.join(subagentsDir, entry.name), path.join(dest, entry.name));
-          if (entry.name.endsWith('.jsonl') || entry.name.endsWith('.jsonl.gz')) {
-            ensure7z(path.join(dest, entry.name));
-          }
-        }
-      }
-    }
-    if (agentFrameworkOf(session.framework) === 'codex') {
-      const dest = path.join(sessionDir, 'subagents');
-      for (const subFile of listCodexSubagentRolloutFiles(sourceResolved!, session.taskId)) {
-        fs.mkdirSync(dest, { recursive: true });
-        const target = path.join(dest, path.basename(subFile));
-        fs.copyFileSync(subFile, target);
-        if (target.endsWith('.jsonl') || target.endsWith('.jsonl.gz')) ensure7z(target);
-      }
+    // subagents 随行：源声明的子代理文件及其 meta（subagents/ 下，文件名保持
+    // 原名），拷入后 ensure7z 统一出仓形态
+    for (const ref of refs) {
+      if (ref.role !== 'subagent' && ref.role !== 'subagent-meta') continue;
+      const target = path.join(sessionDir, ...ref.relPath.split('/'));
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.copyFileSync(ref.filePath, target);
+      if (ref.role === 'subagent' && !target.endsWith('.7z')) ensure7z(target);
     }
   } else {
     // DB 导出固定写 <scratch>/sessions/<sid>/——导完整体挪到目标位（bundle

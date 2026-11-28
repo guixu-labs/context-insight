@@ -6,7 +6,7 @@
 // INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 // See LICENSE in the root of the software repository for the full text of the License.
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Session } from '@prisma/client';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,6 +14,15 @@ import os from 'node:os';
 import { isSafeTaskId } from '@/lib/task-id';
 import { VERSION } from '@/lib/version';
 
+// 会话独立 SQLite 导出件（context-insight 容器格式）的唯一写管线。件 = 文件级
+// 格式头 ExportMeta + N 行 Session 及各自的派生行（Turn / ToolCall / SkillEvent /
+// Execution / ExecutionSkill / SessionSkill / InteractionBridge）。读回侧是
+// adapters/context-insight（导入向导 / ctxi import / 回收站恢复同一入口）。
+// 两个入口、一条写管线：
+//   exportSessionRows(rowIds)  按行导出、一杆多行——run 作用域（solo = 1 行 /
+//                              bundle = 全部成员行）导出用的就是它；
+//   exportSession(taskId, …)   单会话、按 taskId × 记录类定位到行再委托——回收站
+//                              「按行归档」的入口。
 // ExportMeta = 导出格式的 magic header（与 lake JSONL 导出的 meta.json
 // producer 声明对称）：producer 让件自报产源（内容级识别的强信号，不再
 // 只靠 Session 表名启发式），schemaVersion 为导出 schema 演进留版本门。
@@ -239,6 +248,17 @@ function toISO(d: Date | null): string | null {
   return d ? d.toISOString() : null;
 }
 
+/** 一次导出的产出摘要（各行数按表计；sessions = 写入的会话行数） */
+export interface SessionArchiveSummary {
+  path: string;
+  sessions: number;
+  turns: number;
+  toolCalls: number;
+  skillEvents: number;
+  executions: number;
+  bridges: number;
+}
+
 export async function exportSession(
   taskId: string,
   outputPath?: string,
@@ -250,12 +270,6 @@ export async function exportSession(
   }
   const client = prisma ?? new PrismaClient();
 
-  // 提升到 try 外：catch 清理 tmp 残骸（原子改名保证正式条目从未诞生）需要
-  // 可见性；db 延迟开启（prisma 连不上时未开）
-  const outPath = outputPath ?? path.join(os.tmpdir(), `context_session_${taskId}.db`);
-  const tmpPath = `${outPath}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 10)}`;
-  let db: InstanceType<typeof Database> | undefined;
-
   try {
     const where: Record<string, string> = { taskId };
     if (framework) where.framework = framework;
@@ -266,6 +280,44 @@ export async function exportSession(
     if (!session) {
       throw new Error(`Session not found: "${taskId}"`);
     }
+    return (await exportSessionRows([session.id], outputPath, client)).path;
+  } finally {
+    if (!prisma) await client.$disconnect();
+  }
+}
+
+export async function exportSessionRows(
+  rowIds: string[],
+  outputPath?: string,
+  prisma?: PrismaClient,
+): Promise<SessionArchiveSummary> {
+  if (rowIds.length === 0) {
+    throw new Error('No session rows to export');
+  }
+  const client = prisma ?? new PrismaClient();
+
+  // 未指定输出 = 临时件（按进程 + 随机后缀命名：并发导出不互踩），消费方
+  // （HTTP 端点读完即删）不关心名字
+  const outPath = outputPath ?? path.join(os.tmpdir(), `context_session_export_${process.pid}-${Date.now()}.db`);
+  const tmpPath = `${outPath}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 10)}`;
+  let db: InstanceType<typeof Database> | undefined;
+
+  try {
+    // 行定位：rowId = Prisma Session.id（cuid 全局唯一），调用序即写入序。
+    // 任一行缺失整体失败——少写一个成员的导出件是静默的数据丢失
+    const found = await client.session.findMany({ where: { id: { in: rowIds } } });
+    const byId = new Map(found.map(row => [row.id, row] as const));
+    const sessions: Session[] = [];
+    const missing: string[] = [];
+    for (const id of rowIds) {
+      const row = byId.get(id);
+      if (row) sessions.push(row);
+      else missing.push(id);
+    }
+    if (missing.length > 0) {
+      throw new Error(`Session not found: ${missing.length} of ${rowIds.length} rows`);
+    }
+    const sessionIds = sessions.map(s => s.id);
 
     // 写入临时文件、成功后原子改名：同路径重复导出（回收站覆盖归档）与下方
     // 分块多事务写入都靠这层保证消费方（restore 导入）永远只见到完整快照——
@@ -353,10 +405,7 @@ export async function exportSession(
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    // Pre-fetch all related data
-
-    // Pre-fetch all related data
-    const turns = await client.turn.findMany({ where: { sessionId: session.id } });
+    const turns = await client.turn.findMany({ where: { sessionId: { in: sessionIds } }, orderBy: { turnIndex: 'asc' } });
     const turnIds = turns.map(t => t.id);
     const toolCalls = turnIds.length > 0
       ? await client.toolCall.findMany({ where: { turnId: { in: turnIds } } })
@@ -364,13 +413,13 @@ export async function exportSession(
     const skillEvents = turnIds.length > 0
       ? await client.skillEvent.findMany({ where: { turnId: { in: turnIds } } })
       : [];
-    const executions = await client.execution.findMany({ where: { sessionId: session.id } });
+    const executions = await client.execution.findMany({ where: { sessionId: { in: sessionIds } } });
     const executionIds = executions.map(e => e.id);
     const executionSkills = executionIds.length > 0
       ? await client.executionSkill.findMany({ where: { executionId: { in: executionIds } } })
       : [];
-    const sessionSkills = await client.sessionSkill.findMany({ where: { sessionId: session.id } });
-    const bridges = await client.interactionBridge.findMany({ where: { sessionId: session.id } });
+    const sessionSkills = await client.sessionSkill.findMany({ where: { sessionId: { in: sessionIds } } });
+    const bridges = await client.interactionBridge.findMany({ where: { sessionId: { in: sessionIds } } });
 
     // 事件循环分块写入：better-sqlite3 全同步，几千轮大会话的导出（回收站
     // 归档/删除级联）会连续占住 Node 事件循环数秒——期间整个服务器对其他
@@ -397,18 +446,20 @@ export async function exportSession(
       insertExportMeta.run('exportedAt', new Date().toISOString());
       insertExportMeta.run('insightVersion', VERSION);
 
-      insertSession.run(
-        session.id, session.taskId, session.label, session.query, session.framework, session.model,
-        toISO(session.startTime), toISO(session.endTime),
-        session.totalTokens, session.totalInputTokens, session.totalOutputTokens, session.totalReasoningTokens,
-        session.totalCacheReadTokens, session.totalCacheWriteTokens, session.totalCost, session.totalLatencyMs,
-        session.totalToolCallCount, session.totalLlmCallCount, session.totalSkillLoadCount, session.totalSubagentCount,
-        session.rootExecutionId, session.sourcePath,
-        session.parentId, session.version, session.directory,
-        session.summaryAdditions, session.summaryDeletions, session.summaryFiles,
-        session.user,
-        toISO(session.createdAt), toISO(session.updatedAt),
-      );
+      for (const session of sessions) {
+        insertSession.run(
+          session.id, session.taskId, session.label, session.query, session.framework, session.model,
+          toISO(session.startTime), toISO(session.endTime),
+          session.totalTokens, session.totalInputTokens, session.totalOutputTokens, session.totalReasoningTokens,
+          session.totalCacheReadTokens, session.totalCacheWriteTokens, session.totalCost, session.totalLatencyMs,
+          session.totalToolCallCount, session.totalLlmCallCount, session.totalSkillLoadCount, session.totalSubagentCount,
+          session.rootExecutionId, session.sourcePath,
+          session.parentId, session.version, session.directory,
+          session.summaryAdditions, session.summaryDeletions, session.summaryFiles,
+          session.user,
+          toISO(session.createdAt), toISO(session.updatedAt),
+        );
+      }
     })();
 
     await insertChunked(turns, t =>
@@ -481,8 +532,15 @@ export async function exportSession(
     // 「覆盖归档」反复写同一 taskId__framework.db 会命中），清掉后跨平台可覆盖
     if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
     fs.renameSync(tmpPath, outPath);
-    console.log(`[export] session ${taskId} → ${outPath} (${turns.length} turns, ${toolCalls.length} toolCalls, ${skillEvents.length} skillEvents, ${executions.length} executions, ${bridges.length} bridges)`);
-    return outPath;
+    return {
+      path: outPath,
+      sessions: sessions.length,
+      turns: turns.length,
+      toolCalls: toolCalls.length,
+      skillEvents: skillEvents.length,
+      executions: executions.length,
+      bridges: bridges.length,
+    };
   } catch (e) {
     // 中途失败清 tmp 残骸（正式条目从未诞生——原子改名保证）；原样上抛
     try { db?.close(); } catch { /* 已关或未开 */ }

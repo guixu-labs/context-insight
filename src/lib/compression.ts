@@ -14,20 +14,13 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import sevenzipBin from '7zip-bin';
+import { sevenZipBin } from '@/lib/seven-zip-bin';
 
 export const SEVENZ_EXT = '.jsonl.7z';
 export const GZ_EXT = '.jsonl.gz';
 
 // 同内容同字节：关全部时间戳（否则档案内嵌 mtime，重传必产新 blob）
 const SEVENZ_DETERMINISTIC = ['-mtm=off', '-mta=off', '-mtc=off'];
-
-function sevenza(): string {
-  const bin = sevenzipBin.path7za;
-  // 部分镜像安装剥执行位（实测 npmmirror）——落 chmod 兜底，失败交给 spawn 报错
-  try { fs.chmodSync(bin, 0o755); } catch { /* best-effort */ }
-  return bin;
-}
 
 export function is7z(p: string): boolean { return p.endsWith('.7z'); }
 export function isGz(p: string): boolean { return p.endsWith('.gz'); }
@@ -63,7 +56,7 @@ function assertNotLfsPointer(filePath: string): void {
 }
 
 function run7za(args: string[], maxBuffer = 1 << 28): Buffer {
-  const r = spawnSync(sevenza(), args, { maxBuffer, stdio: ['ignore', 'pipe', 'pipe'] });
+  const r = spawnSync(sevenZipBin(), args, { maxBuffer, stdio: ['ignore', 'pipe', 'pipe'] });
   if (r.status !== 0) {
     throw new Error(`7za ${args[0]} failed (exit ${r.status}): ${r.stderr?.toString().slice(0, 500)}`);
   }

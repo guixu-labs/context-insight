@@ -83,6 +83,23 @@ export interface SubagentRef {
   type: string | null;
 }
 
+/** 会话原始文件在文件集里的角色：main = 会话主文件；meta = 主文件的伴随
+ *  meta（cpx cc-session-meta）；subagent = 子代理会话文件；subagent-meta =
+ *  子代理文件的伴随 meta。 */
+export type SessionFileRole = 'main' | 'meta' | 'subagent' | 'subagent-meta';
+
+/** 会话原始文件引用（listSessionFiles 能力的产出） */
+export interface SessionFileRef {
+  role: SessionFileRole;
+  /** 盘上真实路径与真实形态（.jsonl / .jsonl.7z / .jsonl.gz 原样，不归一） */
+  filePath: string;
+  /** 该文件在「会话目录」里的相对路径（posix 分隔，文件名保持原名）：主文件
+   *  与伴随 meta 在根，子代理文件在 subagents/ 下。同一会话的各文件 relPath
+   *  互不重名（DSH 的子代理日志与主日志同名，靠 subagents/<id>/ 一层区分）。
+   *  消费方按此摆放到 sessions/<sid>/ 之下即得 bundle 布局。 */
+  relPath: string;
+}
+
 /** 会话级身份/元数据声明（readSessionMeta 能力的产出，身份轴的载体）。
  *  源只声明自己有的字段，全部可选——缺省由 data-service 落库链兜底
  *  （framework 退源级缺省、version 退 extractVersion）。 */
@@ -123,6 +140,14 @@ export interface SourceDescriptor {
    * dbPath 可能是文件或 sessions 根目录（UI「列表选择→导入」传目录）——
    * 适配器须自行按 sessionId 解析，两条路径结果必须同构。 */
   readSubagents?(dbPath: string, sessionId: string): RawInteraction[];
+  /** 列出一个会话在源端的原始文件集（绝对路径，盘上真实形态）：首项是主
+   *  文件，其后是伴随件（meta / 子代理会话文件及其 meta）。只列「本会话
+   *  独占」的文件——共享容器（opencode 的 opencode.db 全体会话一个库）没有
+   *  会话级原件，不实现本能力。返回 null = 该源没有会话级原件；返回空数组 =
+   *  有原件但主文件在盘上找不到（被删/被移）。dbPath 语义同 readSubagents
+   *  （文件或 sessions 根目录），发现规则与 readSubagents 同源——导出归档
+   *  与数据仓装配共用，不再各自抄一份目录布局。 */
+  listSessionFiles?(dbPath: string, sessionId: string): SessionFileRef[] | null;
   /** 子代理关联映射（SubagentLinkageMaps：toolUseId / claudeAgentId / 任务
    * 文本 → subagentSessionId），建桥与技能归因共用；无此数据结构的源不实现。 */
   collectSubagentLinkage?(dbPath: string, sessionId: string): SubagentLinkageMaps;

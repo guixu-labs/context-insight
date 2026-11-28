@@ -18,4 +18,5 @@ export {
   readSubagentInteractions,
   extractVersion,
   resolveSessionFile,
+  listSessionFiles,
 } from './source';

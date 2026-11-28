@@ -11,6 +11,7 @@ import { truncateUtf16Safe } from '@/lib/shared/text-strip';
 import path from 'node:path';
 import { readCaptureBuffer, readCaptureHead } from '@/lib/compression';
 import type { SessionListItem, RawInteraction, ToolCallInfo, TokenUsage } from '../../shared/types';
+import type { SessionFileRef } from './contract';
 import { classifyCodexUserInjection } from './injections/codex';
 import { isRolloutFileName, rolloutSessionIdOf } from './codex-naming';
 import {
@@ -712,7 +713,7 @@ function findRolloutFile(dirPath: string, sessionId: string): string | null {
   return null;
 }
 
-function resolveSessionFilePath(filePath: string, sessionId: string): string | null {
+export function resolveSessionFilePath(filePath: string, sessionId: string): string | null {
   let stat: fs.Stats;
   try {
     stat = fs.statSync(filePath);
@@ -960,6 +961,22 @@ export function listSubagentRolloutFiles(filePath: string, sessionId: string): s
   const discovered: SubagentRollout[] = [];
   discoverSubagentRollouts(resolved, sessionId, 0, new Set(), discovered);
   return discovered.map(s => s.filePath);
+}
+
+// 会话原始文件集（SourceDescriptor.listSessionFiles 能力实现）：主 rollout +
+// listSubagentRolloutFiles 发现的子代理 rollout（内容驱动发现，与 readSubagents
+// 同源）。codex 落盘无伴随 meta。
+export function listSessionFiles(filePath: string, sessionId: string): SessionFileRef[] | null {
+  const main = resolveSessionFilePath(filePath, sessionId);
+  if (!main) return [];
+  return [
+    { role: 'main', filePath: main, relPath: path.basename(main) },
+    ...listSubagentRolloutFiles(filePath, sessionId).map(sub => ({
+      role: 'subagent' as const,
+      filePath: sub,
+      relPath: path.posix.join('subagents', path.basename(sub)),
+    })),
+  ];
 }
 
 interface SubagentRollout {

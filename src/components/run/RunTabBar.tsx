@@ -7,16 +7,19 @@
 // INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
 // See LICENSE in the root of the software repository for the full text of the License.
 
-// Run 详情页导航（凹槽分段控件）：
-// ①凹槽轨道（rounded-full 浅灰轨道）内横排药丸，居中收束（w-fit：宽屏
-//   居中成"主控台"，窄屏自动占满整行、溢出走滚动 + mask 边缘渐隐提示）；
+// Run 详情页 tab 导航（凹槽分段控件），挂在页头单行应用栏的中段、居页头正中：
+// ①凹槽轨道（rounded-full 浅灰轨道）内横排药丸，按内容收束（w-fit）——本组件
+// 只管自身宽度，居中由页头承担（左右两翼等权平分剩余空间）；中段放不下时
+// 走横滚 + mask 边缘渐隐提示；
 // ②活跃指示器 = 浮起卡舌（bg-card + 发丝环 + 分层投影，与 Audit 域导航、
 //   成员轨道同一语法），纯 transform/width 过渡（弹簧曲线）滑向活跃项——
 //   定位经 useLayoutEffect 量测、直接写 style，零重渲染、不闪初始态；
 // ③活跃 tab 自动滚入视野（手动 scrollLeft 计算，不影响页面滚动）；
 // ④图标彩色常驻：非活跃压暗（opacity-55），激活时点亮——卡舌滑入 +
 //   色彩点亮的双重激活反馈；
-// ⑤面板淡入切换由页面侧容器类承担（display 翻转即重放 CSS 动画）。
+// ⑤面板淡入切换由页面侧容器类承担（display 翻转即重放 CSS 动画）；
+// ⑥pending：页面数据未到时以真身作骨架——同一渲染表、同一宽度，按钮禁用、
+//   整条呼吸；数据到达只解除禁用，无落位跳变。
 // 契约保持：tab 按钮为普通 button（无 ARIA tab 角色——工作台既有约定，
 // IT 锁定）；wire/replay 高级门逻辑原样迁移（?a / NEXT_PUBLIC_SHOW_...）。
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react"
@@ -59,12 +62,16 @@ export const RUN_TABS_DEFAULT_VISIBLE: readonly RunTabDef[] = RUN_TABS.filter(t 
 /** 活跃指示器过渡曲线：快出缓收，无回弹过冲 */
 const INDICATOR_TRANSITION = "transition-[transform,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
 
-export function RunTabBar({ tabs, active, onSelect, className }: {
+export interface RunTabBarProps {
   tabs: readonly RunTabDef[]
   active: RunTabKey
   onSelect: (key: RunTabKey) => void
-  className?: string
-}): ReactNode {
+  /** 数据未到：按钮禁用、整条呼吸（页面加载态以真身作骨架） */
+  pending?: boolean
+}
+
+export function RunTabBar({ tabs, active, onSelect, pending = false }: RunTabBarProps): ReactNode {
+  const rootRef = useRef<HTMLDivElement | null>(null)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   const indicatorRef = useRef<HTMLDivElement | null>(null)
   const buttonsRef = useRef(new Map<string, HTMLButtonElement>())
@@ -101,29 +108,40 @@ export function RunTabBar({ tabs, active, onSelect, className }: {
 
   useLayoutEffect(reposition, [reposition, tabs])
 
-  // 滚动 / 尺寸变化 → 重定位（rAF 节流，被动监听）
+  // 滚动 / 可用宽度变化 → 重定位。rAF 按帧节流：回调执行后放行下一帧
+  // （旗标不复位 = 首帧之后的重算全被吞掉）。观测对象是外层可用宽度，
+  // 不只是轨道：轨道按内容收束，「从放不下到放得下」时轨道自身在变宽，
+  // 而右缘渐隐该在这一刻撤掉；被动监听
   useEffect(() => {
+    const root = rootRef.current
     const scroller = scrollerRef.current
-    if (!scroller) return
+    if (!root || !scroller) return
     let raf = 0
-    const onScroll = () => { if (!raf) raf = requestAnimationFrame(reposition) }
-    scroller.addEventListener("scroll", onScroll, { passive: true })
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(onScroll) : null
+    const onChange = () => {
+      if (raf) return
+      raf = requestAnimationFrame(() => { raf = 0; reposition() })
+    }
+    scroller.addEventListener("scroll", onChange, { passive: true })
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(onChange) : null
+    ro?.observe(root)
     ro?.observe(scroller)
     return () => {
-      scroller.removeEventListener("scroll", onScroll)
+      scroller.removeEventListener("scroll", onChange)
       ro?.disconnect()
       if (raf) cancelAnimationFrame(raf)
     }
   }, [reposition])
 
   return (
-    <div className={cn("relative", className)} data-run-tabbar>
-      {/* 凹槽轨道 = 滚动容器本体：w-fit 宽屏居中收束（主控台位）、窄屏
-          自动占满整行走横滚；mask 边缘渐隐挂在轨道上（半透明底色也成立） */}
+    <div ref={rootRef} className="relative" data-run-tabbar data-pending={pending || undefined} aria-hidden={pending || undefined}>
+      {/* 凹槽轨道 = 滚动容器本体：按内容收束、左对齐，中段放不下才横滚；mask
+          边缘渐隐挂在轨道上（半透明底色也成立） */}
       <div
         ref={scrollerRef}
-        className="relative mx-auto flex w-fit max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-full bg-foreground/[0.04] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:bg-foreground/[0.07]"
+        className={cn(
+          "relative flex w-fit max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-full bg-foreground/[0.04] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:bg-foreground/[0.07]",
+          pending && "animate-pulse",
+        )}
       >
         {/* 活跃指示器（浮起卡舌）：随活跃药丸滑动（transform/width 过渡，圆角不变形） */}
         <div
@@ -141,6 +159,7 @@ export function RunTabBar({ tabs, active, onSelect, className }: {
             <button
               key={tab.key}
               type="button"
+              disabled={pending}
               ref={el => { if (el) buttonsRef.current.set(tab.key, el); else buttonsRef.current.delete(tab.key) }}
               onClick={() => { if (tab.key !== active) onSelect(tab.key) }}
               className={cn(

@@ -6,7 +6,7 @@
 // INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
 // See LICENSE in the root of the software repository for the full text of the License.
 
-/** 泳道槽位分配（纯函数，从 AgentSwimlaneV2 抽出便于函数级 IT）。
+/** 泳道槽位分配（纯函数，由 swimlane-model 调用，函数级 IT 见 tests/ut/swimlane-model.test.ts）。
  *
  *  现状（保留为无车道时的行为）：全部条子按开始时间贪心放进「最早空闲」槽。
  *  车道模式：声明车道按序各占 ⌈车道内部真实并发⌉ 个连续槽（车道池），命中

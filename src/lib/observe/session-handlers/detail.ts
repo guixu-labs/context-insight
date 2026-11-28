@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
     const isProxySession = isProxyVersion(session.version);
     const turnTimes = await prisma.turn.findMany({
       where: { sessionId: session.id },
-      select: { isSubagent: true, subagentSessionId: true, createdAt_ts: true, completedAt: true, latencyMs: true },
+      select: { id: true, isSubagent: true, subagentSessionId: true, createdAt_ts: true, completedAt: true, latencyMs: true },
     });
     const spansByKey = buildAgentSpans(turnTimes, isProxySession);
     const spanFor = (isSubagent: boolean, agentSessionId: string | null) =>

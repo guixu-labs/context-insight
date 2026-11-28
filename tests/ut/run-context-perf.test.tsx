@@ -364,7 +364,7 @@ describe('Run 详情 Context/Perf tab（ContextTracker run 泛化）', () => {
     )).toBe(true);
   });
 
-  it('?tab=perf：run 视角卡片栈全景（画像/构成/序列/泳道/效率），无会话隔离；跳转收敛 turn 深链', async () => {
+  it('?tab=perf：run 视角卡片栈全景（画像/热点/效率），无会话隔离；跳转收敛 turn 深链', async () => {
     await renderPage('?tab=perf');
 
     const tab = document.querySelector('[data-run-tab="perf"]');
@@ -372,17 +372,17 @@ describe('Run 详情 Context/Perf tab（ContextTracker run 泛化）', () => {
     // 无成员选择模块，默认即合并全景
     expect([...tab!.querySelectorAll('button')].find(b => b.textContent?.startsWith('全部'))).toBeUndefined();
 
-    // 四路取数全部走 run 端点（不带 member），session 端点零触达
-    //（lanes = 时间线车道表，泳道图自 Overview 迁入后的新增取数）
+    // 取数全部走 run 端点（不带 member），session 端点零触达；执行时间线
+    // 已迁 Turns 顶部——Perf 不再取车道表（lanes 归 Turns 时间线取数）
     expect(fetchCalls.some(u => u === '/api/observe/run/minidemo01/executions')).toBe(true);
     expect(fetchCalls.some(u => u.startsWith('/api/observe/run/minidemo01/turns?') && u.includes('pageSize=20000'))).toBe(true);
     expect(fetchCalls.some(u => u === '/api/observe/run/minidemo01/bridges')).toBe(true);
-    expect(fetchCalls.some(u => u === '/api/observe/run/minidemo01/lanes')).toBe(true);
+    expect(fetchCalls.some(u => u === '/api/observe/run/minidemo01/lanes')).toBe(false);
     expect(fetchCalls.some(u => u.startsWith('/api/observe/session/'))).toBe(false);
     expect(fetchCalls.some(u => u.includes('member='))).toBe(false);
 
     // 卡片栈：运行画像（两区头卡：墙钟构成 + Token 构成，总量瓦片已归
-    // Overview）+ 执行时间线（泳道图自 Overview 迁入）+ 热点排行（成员A
+    // Overview）+ 热点排行（成员A
     // 单元 + rop-研究员 子代理单元带父成员归属）；执行序列柱状图已退役
     // （与时间线/热点排行单元重复），类型构成亦退役（多成员 run 按 agent
     // 名混聚成孤条零信息，合计行与 Overview 总量复读）
@@ -392,7 +392,9 @@ describe('Run 详情 Context/Perf tab（ContextTracker run 泛化）', () => {
     const profileCard = perf!.querySelector('[data-testid="perf-profile-card"]');
     expect(profileCard).toBeTruthy();
     expect(profileCard!.textContent).toContain('Token 构成');
-    expect(perfText).toContain('Agent Swimlane');
+    // 执行时间线不在 Perf（已迁 Turns 顶部）
+    expect(perfText).not.toContain('Agent Swimlane');
+    expect(perf!.querySelector('[data-bar]')).toBeNull();
     expect(perfText).toContain('热点排行');
     expect(perfText).toContain('总耗时');
     expect(perfText).toContain('成员A');
@@ -413,37 +415,26 @@ describe('Run 详情 Context/Perf tab（ContextTracker run 泛化）', () => {
     expect(perf!.querySelector('.perf-bar-rise')).toBeNull();
     expect(perf!.querySelector('.perf-grow-x')).toBeNull();
 
-    // 跳转①：主泳道承接 subagent 结束的活跃段双击 → 父 Agent 接收回复的 turn
-    const handback = perf!.querySelector('[data-root-segment-owner="rop-sub-1"]');
-    expect(handback).toBeTruthy();
-    ensurePushSpy().mockClear();
-    await act(async () => {
-      handback!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
-    });
-    expect(String(ensurePushSpy().mock.calls[0]?.[2])).toContain('turn=rop-t-parent-ack');
-
-    // 跳转②：时间线子代理条双击 → Turns 深链（该会话首轮）
-    const subBar = perf!.querySelector('[data-bar="rop-exec-sub"]');
-    expect(subBar).toBeTruthy();
-    ensurePushSpy().mockClear();
-    await act(async () => {
-      subBar!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
-    });
-    expect(ensurePushSpy().mock.calls.length).toBeGreaterThan(0);
-    expect(String(ensurePushSpy().mock.calls[0]?.[2])).toContain('tab=turns');
-    expect(String(ensurePushSpy().mock.calls[0]?.[2])).toContain('turn=rop-t-sub0');
-
-    // 跳转③：热点行内定位角标 → 同一深链出口；跳转②后视图已在目标态，
-    // 同值 navigate 是 no-op——不产生冗余历史条目（条目栈零增长）
+    // 跳转①：热点行内定位角标 → Turns 深链（该单元首轮）
     const locateBtn = subLane!.querySelector('[title="在 Turns 时间线定位该单元"]');
     expect(locateBtn).toBeTruthy();
     ensurePushSpy().mockClear();
     await act(async () => {
       locateBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
+    expect(ensurePushSpy().mock.calls.length).toBeGreaterThan(0);
+    expect(String(ensurePushSpy().mock.calls[0]?.[2])).toContain('tab=turns');
+    expect(String(ensurePushSpy().mock.calls[0]?.[2])).toContain('turn=rop-t-sub0');
+
+    // 同一出口再点一次：视图已在目标态，同值 navigate 是 no-op——不产生冗余
+    // 历史条目（条目栈零增长）
+    ensurePushSpy().mockClear();
+    await act(async () => {
+      locateBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
     expect(ensurePushSpy().mock.calls.length).toBe(0);
 
-    // 跳转④：热点行展开 → 轮次行点击 → 该轮深链（成员A 首轮）
+    // 跳转②：热点行展开 → 轮次行点击 → 该轮深链（成员A 首轮）
     const memberLane = perf!.querySelector('[data-lane-row="ses_mini_a"]')!;
     await act(async () => {
       memberLane.querySelector('[role="button"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));

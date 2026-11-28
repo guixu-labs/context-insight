@@ -118,17 +118,28 @@ afterAll(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
+/** 区间按起止（可选推断标记）匹配：区间另带 turnId（时间线「时刻 → 轮次」的
+ *  跳转身份，每个区间指向库里一行），不参与整对象相等 */
+function hasInterval(
+  agent: { activeIntervals: Array<{ start: number; end: number; inferred?: boolean; turnId?: string }> },
+  start: number,
+  end: number,
+  inferred?: boolean,
+): boolean {
+  return agent.activeIntervals.some(iv => iv.start === start && iv.end === end && (inferred === undefined || iv.inferred === inferred));
+}
+
 describe('GET /api/observe/session — 泳道 per-turn 活跃区间', () => {
   it('proxy 会话：assistant 行按 latencyMs 展开成 [t-latency, t]，零宽区间消失', async () => {
     const { root } = await importCapture('swimlane-iv-proxy', true);
 
     // a1：10:00:05 完成、duration_ms 1200 → 在途窗口 [10:00:03.800, 10:00:05]
     // （inferred=true：latency 回填的展开区，统一 Run 时间口径后区间携带推断标记）
-    expect(root.activeIntervals).toContainEqual({ start: at(10, 0, 3, 800), end: at(10, 0, 5), inferred: true });
+    expect(hasInterval(root, at(10, 0, 3, 800), at(10, 0, 5), true)).toBe(true);
     // a2：10:03:05 完成、duration_ms 800 → [10:03:04.200, 10:03:05]
-    expect(root.activeIntervals).toContainEqual({ start: at(10, 3, 4, 200), end: at(10, 3, 5), inferred: true });
+    expect(hasInterval(root, at(10, 3, 4, 200), at(10, 3, 5), true)).toBe(true);
     // 修复前这两条都是零宽 [t, t]（被前端 filter 丢掉 → 该 turn 画成休眠）
-    expect(root.activeIntervals).not.toContainEqual({ start: at(10, 0, 5), end: at(10, 0, 5) });
+    expect(hasInterval(root, at(10, 0, 5), at(10, 0, 5))).toBe(false);
     expect(root.activeIntervals.some(iv => iv.end === iv.start)).toBe(false);
 
     // span（整根条子的浅色底）仍以 turn 位置为准，不因展开而左移
@@ -140,8 +151,8 @@ describe('GET /api/observe/session — 泳道 per-turn 活跃区间', () => {
 
     // native 单行 assistant 的 completedAt == createdAt_ts（适配器口径），
     // latencyMs 照样是 1200 但不在展开范围内（inferred=false：非推断区）
-    expect(root.activeIntervals).toContainEqual({ start: at(10, 0, 5), end: at(10, 0, 5), inferred: false });
-    expect(root.activeIntervals).not.toContainEqual({ start: at(10, 0, 3, 800), end: at(10, 0, 5) });
+    expect(hasInterval(root, at(10, 0, 5), at(10, 0, 5), false)).toBe(true);
+    expect(hasInterval(root, at(10, 0, 3, 800), at(10, 0, 5))).toBe(false);
   });
 
   it('isSubagent=true 但 subagentSessionId 为 null 的异常行不并进主 agent 的 span/活跃段', async () => {

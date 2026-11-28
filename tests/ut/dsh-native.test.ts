@@ -14,6 +14,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import {
   convertDshSession,
   listSessions,
+  listSessionFiles,
   readSession,
   readSubagentInteractions,
 } from '@/lib/ingest/dsh-bridge/native';
@@ -150,6 +151,28 @@ describe('DSH 原生：发现 / 列举 / 子代理建链', () => {
     expect(sub.every(i => i.subagent_session_id === CHILD)).toBe(true);
     expect(sub.every(i => i.subagent_name === 'Read README')).toBe(true);
     expect(sub.every(i => i.subagent_type === 'one-shot')).toBe(true);
+  });
+
+  it('listSessionFiles：主日志 + 子代理日志；子代理与主日志同名，靠 subagents/<会话目录>/ 一层区分（两种布局同构）', () => {
+    const layouts = [SESSIONS_ROOT, EXPORT_ROOT];
+    const relPaths = layouts.map(root => {
+      const refs = listSessionFiles(root, SID)!;
+      expect(refs[0].role).toBe('main');
+      expect(path.basename(refs[0].filePath)).toMatch(/^session\.v4\.jsonl(\.zstd)?$/);
+      expect(refs[0].relPath).toBe(path.basename(refs[0].filePath));
+      const subs = refs.filter(r => r.role === 'subagent');
+      expect(subs).toHaveLength(1);
+      for (const ref of refs) {
+        expect(ref.filePath.startsWith(root)).toBe(true);
+        // 导出布局的 jsonl 是明文 / 原生是 zstd：两种形态原样保留
+        expect(ref.relPath).toBe(ref.role === 'main' ? path.basename(ref.filePath) : `subagents/${CHILD}/${path.basename(ref.filePath)}`);
+      }
+      // 同一会话内各文件 relPath 互不重名（平铺会让子代理日志盖掉主日志）
+      expect(new Set(refs.map(r => r.relPath)).size).toBe(refs.length);
+      return refs.map(r => r.relPath);
+    });
+    expect(relPaths[0]).toEqual(relPaths[1]);
+    expect(listSessionFiles(SESSIONS_ROOT, 'no-such-session')).toEqual([]);
   });
 
   it('两种磁盘布局（原生 <cwd>/<sid>/ 与导出 <sid>/subagents/）结果同构', () => {

@@ -9,15 +9,17 @@
 import { Command } from 'commander';
 import { InsightClient } from '../client';
 import { formatHeader, formatDivider, formatSuccess, formatWarning, theme } from '../utils/colors';
-import fs from 'node:fs';
 import path from 'node:path';
+import { archiveExportFileName, dbExportFileName } from '@/lib/observe/export-name';
+import { soloRunIdOf } from '@/lib/run/identity';
 
 export function exportCommand(): Command {
   const cmd = new Command('export');
   cmd
-    .description('Export session to a standalone SQLite database file')
+    .description('Export session: standalone SQLite database (default, re-importable) or original source files as a zip (--archive)')
     .option('--session <taskId>', 'Session taskId to export')
-    .option('--output <path>', 'Output file path (default: ./context_session_<taskId>.db)')
+    .option('--archive', 'Export the session\'s original source files (incl. subagents) as a zip instead of the SQLite database')
+    .option('--output <path>', 'Output file path (default: ./context_session_<taskId>.db | .zip)')
     .option('--json', 'Output result as JSON')
     .action(async (opts, command) => {
       const globalOpts = command.parent?.opts() ?? {};
@@ -31,22 +33,30 @@ export function exportCommand(): Command {
       }
 
       const taskId = opts.session;
-      const outputPath = opts.output ?? path.join(process.cwd(), `context_session_${taskId}.db`);
+      const archive = Boolean(opts.archive);
+      // 缺省输出名与工作台导出菜单同源（export-name 单一源）
+      const nameInput = { solo: true, runId: soloRunIdOf(taskId), taskId };
+      const outputPath = opts.output ?? path.join(process.cwd(), archive ? archiveExportFileName(nameInput) : dbExportFileName(nameInput));
 
       if (!opts.json) {
-        console.log(formatHeader(`Export Session: ${taskId}`));
+        console.log(formatHeader(`Export Session${archive ? ' (original files)' : ''}: ${taskId}`));
         console.log(formatDivider());
       }
 
-      const result = await client.exportSession(taskId, outputPath);
+      const result = archive
+        ? await client.exportSessionArchive(taskId, outputPath)
+        : await client.exportSession(taskId, outputPath);
 
       if (opts.json) {
-        console.log(JSON.stringify({ taskId, filePath: outputPath, size: result.size }, null, 2));
+        console.log(JSON.stringify({ taskId, kind: archive ? 'archive' : 'db', filePath: outputPath, size: result.size }, null, 2));
         return;
       }
 
       console.log(formatSuccess(`✓ Exported session ${taskId} → ${outputPath}`));
       console.log(theme.muted(`  File size: ${result.size} bytes`));
+      if (archive) {
+        console.log(theme.muted('  包内 export-manifest.json 记录每个会话用的是原文件还是导出 db'));
+      }
     });
 
   return cmd;

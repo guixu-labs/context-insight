@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { BreathCards } from "@/components/ui/loading";
 import { cn } from "@/lib/utils";
 import { ExpandableText } from "@/components/observe/ExpandableText";
-import { isCommandTurn, isCommandCaveat, isCommandStdout, parseCommandTurns, formatCommandDisplay, isContinuationTurn, parseContinuationTurn } from "@/lib/shared/command-parser";
+import { isCommandTurn, isCommandTail, parseCommandTurns, formatCommandDisplay, isContinuationTurn, parseContinuationTurn } from "@/lib/shared/command-parser";
 import { buildSubagentNumbers } from "@/lib/subagent-numbering";
 
 import type { SessionRef } from "@/lib/run/model";
@@ -198,7 +198,7 @@ export function summarizeOutput(
  *  不独立成行（null = 不进入列表，也不参与筛选计数） */
 export function classifyDisplayRole(t: TurnsBlockTurn): string | null {
   const text = t.contentSummary ?? "";
-  if (isCommandCaveat(text) || isCommandStdout(text)) return null;
+  if (isCommandTail(text)) return null;
   if (t.agentName === "compaction-boundary") return "compaction";
   if (isCommandTurn(text)) return "command";
   if (isContinuationTurn(text)) return "continuation";
@@ -484,7 +484,7 @@ function buildDisplayTurns(rootTurns: TurnsBlockTurn[]): DisplayTurn[] {
   let leadId: string | null = null;
   for (const t of rootTurns) {
     const text = t.contentSummary ?? "";
-    if (isCommandTurn(text) || isCommandCaveat(text) || isCommandStdout(text)) {
+    if (isCommandTurn(text) || isCommandTail(text)) {
       groupTexts.push(text);
       if (isCommandTurn(text)) leadId = t.turnId;
     } else {
@@ -502,7 +502,7 @@ function buildDisplayTurns(rootTurns: TurnsBlockTurn[]): DisplayTurn[] {
   const enhanced = rootTurns
     .filter(t => {
       const text = t.contentSummary ?? "";
-      return !(isCommandCaveat(text) || isCommandStdout(text));
+      return !isCommandTail(text);
     })
     .map((t): DisplayTurn => {
       const text = t.contentSummary ?? "";

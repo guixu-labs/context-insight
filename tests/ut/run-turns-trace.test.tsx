@@ -10,14 +10,14 @@
 
 // Run 详情 Turns tab IT（design: run 级 Turns 变革——Run Player 架构；Trace
 // 退役——搜索归 Turns）：URL 感知 fetch mock 驱动页面级验证——①?tab=turns
-// 深链（Run 轨节点段 + 代带分组 + 首个内容节点自动展开懒加载 + 选中复用
+// 深链（顶部时间线（自 Perf 迁入的执行时间线）+ 代带分组 + 首个内容节点自动展开懒加载 + 选中复用
 // TurnDetail）；②节点懒加载（未展开节点的成员不取数，member 过滤是列表
 // 唯一取形）；③跨成员搜索驻留（命中索引替换左列、点命中开 player 不消失、
 // 已读降透明、退出回节点列表并居中揭示）；④?tab=trace 深链别名落 Turns；
 // ⑤一框两语法（# 即时提示 + #数字 run 级解析直达——服务端真相源、单候选
 // 直接跳、多会话同号轮下钻选择 / 未命中提示）。
 
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { createElement, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Suspense } from 'react';
@@ -154,6 +154,32 @@ vi.stubGlobal('fetch', vi.fn(async (url: string) => {
   if (u.pathname === '/api/observe/run/minidemo01/bridges') {
     return json({ items: [], total: 0 });
   }
+  // 时间线取数（executions / lanes）：两成员各一条 root 执行，逐轮区间带 turnId——
+  // A：02:00:10→02:02:10 一轮；B：02:02:10→02:02:50 两轮各 20s
+  if (u.pathname === '/api/observe/run/minidemo01/executions') {
+    const t = (s: string) => Date.parse(`2026-10-13T${s}.000Z`);
+    const exec = (executionId: string, taskId: string, label: string, start: string, end: string, activeIntervals: unknown[]) => ({
+      executionId, agentName: 'main', agentSessionId: taskId, isSubagent: false, subagentName: null,
+      member: { taskId, label, isProxy: false }, tokens: 100, inputTokens: 80, outputTokens: 20, reasoningTokens: 0,
+      cacheReadInputTokens: 0, cacheCreationInputTokens: 0, maxSingleCallTokens: 100, skillLoadCount: 0,
+      firstPrompt: null, cost: 0, latencyMs: t(end) - t(start), toolCallCount: 1, toolCallErrorCount: 0,
+      llmCallCount: 1, model: 'glm-4.7', createdAt: `2026-10-13T${start}.000Z`,
+      span: { start: t(start), end: t(end) }, activeIntervals,
+    });
+    return json({
+      items: [
+        exec('exec-a', 'ses_mini_a', '成员A', '02:00:10', '02:02:10', [{ start: t('02:00:10'), end: t('02:02:10'), turnId: 'rop-t-a0' }]),
+        exec('exec-b', 'ses_mini_b', '成员B', '02:02:10', '02:02:50', [
+          { start: t('02:02:10'), end: t('02:02:30'), turnId: 'rop-t-b0' },
+          { start: t('02:02:30'), end: t('02:02:50'), turnId: 'rop-t-b1' },
+        ]),
+      ],
+      total: 2,
+    });
+  }
+  if (u.pathname === '/api/observe/run/minidemo01/lanes') {
+    return json({ paradigm: null, lanes: [], source: null });
+  }
   if (u.pathname === '/api/observe/run/minidemo01/turns/search') {
     // 跨成员命中（时间升序：a0 起源在前）——limit/total 护栏由端点契约保证，
     // 这里给足两成员命中 + 过滤面数据（来源/工具/thinking）供驻留面板用例
@@ -239,16 +265,55 @@ async function renderPage(initialSearch = '') {
   await act(async () => { await new Promise(r => setTimeout(r, 20)) });
 }
 
+/** 时间线单击：happy-dom 无布局，轨道统一打桩成 1000px 宽，x 即落点像素 */
+async function clickTimeline(scope: ParentNode, laneKey: string, x: number) {
+  const origRect = HTMLElement.prototype.getBoundingClientRect;
+  HTMLElement.prototype.getBoundingClientRect = function () {
+    return { left: 0, top: 0, right: 1000, bottom: 20, width: 1000, height: 20, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+  };
+  try {
+    const lane = scope.querySelector(`[data-turns-timeline] [data-lane="${laneKey}"]`)!;
+    expect(lane).toBeTruthy();
+    await act(async () => {
+      const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
+      Object.defineProperty(ev, 'clientX', { value: x });
+      lane.dispatchEvent(ev);
+      await new Promise(r => setTimeout(r, 20));
+    });
+  } finally {
+    HTMLElement.prototype.getBoundingClientRect = origRect;
+  }
+}
+
+const origScrollGlobal = Element.prototype.scrollIntoView;
+
+/** 时间线轨道在 happy-dom 里没有布局：给轨道桩 1000px 宽（选中层的像素几何按它换算） */
+const nativeRect = HTMLElement.prototype.getBoundingClientRect;
+beforeEach(() => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const rect = nativeRect.call(this);
+    return this.hasAttribute('data-timeline-track') ? ({ ...rect, width: 1000, right: rect.left + 1000 } as DOMRect) : rect;
+  });
+});
+/** 选中条左缘（相对轨道，px；柔光以它为实心核）：轨道 1000px 宽，百分比 × 10 */
+function selectionX(root: ParentNode): number | null {
+  const el = root.querySelector<HTMLElement>('[data-selected-turn]');
+  if (!el) return null;
+  const m = /^translateX\(([-\d.e]+)px\)$/.exec(el.style.transform);
+  return m ? Number(m[1]) : null;
+}
+
 afterEach(() => {
   act(() => root?.unmount());
   root = null;
   document.body.innerHTML = '';
+  Element.prototype.scrollIntoView = origScrollGlobal;
   restFail.current = false;
   cacheDelta.active = false;
 });
 
 describe('Run 详情 Turns/Trace tab（Run Player 架构）', () => {
-  it('?tab=turns 深链：Run 轨 + 代带节点 + 首个内容节点自动展开（成员懒加载）+ 选中复用 TurnDetail', async () => {
+  it('?tab=turns 深链：时间线 + 代带节点 + 首个内容节点自动展开（成员懒加载）+ 选中复用 TurnDetail', async () => {
     await renderPage('?tab=turns');
 
     const turnsTab = document.querySelector('[data-run-tab="turns"]');
@@ -258,13 +323,18 @@ describe('Run 详情 Turns/Trace tab（Run Player 架构）', () => {
     expect(text).toContain('init');
     expect(text).toContain('build');
     expect(text).toContain('gen-sub');
-    // Run 轨（节点状态时间线）：全节点以状态段单行呈现（等宽按钮排在
-    // 60 节点级 run 上会挤叠），代际发丝分隔在段间
-    const railTrack = turnsTab!.querySelector('[data-rail-track]');
-    expect(railTrack).toBeTruthy();
-    expect(railTrack!.querySelectorAll('button').length).toBe(6);
-    // 主图按代排序（g0 组 → g1 组）——代际分界处一枚发丝刻线
-    expect(railTrack!.querySelectorAll('.w-px').length).toBe(1);
+    // 顶部时间线（执行时间线自 Perf 迁入，取代原节点状态轨）：成员各一道
+    //（道键 = 成员 taskId）、无子代理不出图例；取数走 run 合并端点
+    expect(turnsTab!.querySelector('[data-rail-track]')).toBeNull();
+    const timeline = turnsTab!.querySelector('[data-turns-timeline]')!;
+    expect(timeline).toBeTruthy();
+    expect([...timeline.querySelectorAll('[data-lane]')].map(l => l.getAttribute('data-lane'))).toEqual(['ses_mini_a', 'ses_mini_b']);
+    expect([...timeline.querySelectorAll('[data-lane-label]')].map(l => l.textContent)).toEqual(['成员A', '成员B']);
+    expect(timeline.textContent).toContain('2 执行');
+    expect(timeline.querySelector('[data-legend]')).toBeNull();
+    expect(fetchCalls).toContain('/api/observe/run/minidemo01/executions');
+    expect(fetchCalls).toContain('/api/observe/run/minidemo01/bridges');
+    expect(fetchCalls).toContain('/api/observe/run/minidemo01/lanes');
     // 代带分组头（第 1 次运行 / 回滚 #1）
     expect(text).toContain('第 1 次运行');
     expect(text).toContain('回滚 #1');
@@ -284,11 +354,8 @@ describe('Run 详情 Turns/Trace tab（Run Player 架构）', () => {
     await act(async () => { await new Promise(r => setTimeout(r, 20)) });
     // 选中态：占位文案消失（TurnDetail 播放器接管右侧）
     expect(turnsTab!.textContent).not.toContain('选择一轮开始走查');
-    // Run 轨活动锚定：选中轮所属节点（build g0，承载成员A/B）标识簇常驻——
-    // 状态点 + 节点名 + 位置计数（主图序列第 4 / 共 6 段）
-    const railActive = turnsTab!.querySelector('[data-rail-active]');
-    expect(railActive?.textContent).toContain('build');
-    expect(railActive?.textContent).toMatch(/4\/6/);
+    // 选中层跟随选中轮：成员A首轮就在整段起点 → 选中条左缘在轨道 0px
+    expect(selectionX(turnsTab!)).toBe(0);
     // 播放器壳契约：导航条标题 + 身份药丸 + 指标瓦片标签 + 分组卡语法（灰画布上的无边框圆角卡）
     const playerText = turnsTab!.textContent ?? '';
     expect(playerText).toContain('Turn #0');
@@ -408,7 +475,7 @@ describe('Run 详情 Turns/Trace tab（Run Player 架构）', () => {
     expect(walkRoot.querySelectorAll('.animate-in').length).toBe(0);
   });
 
-  it('选中即揭示：外部跳转（走查/深链/Run 轨）左列表居中定位；列表内点击不揭示', async () => {
+  it('选中即揭示：外部跳转（走查/深链/时间线单击）左列表居中定位；列表内点击不揭示', async () => {
     const revealed: Array<{ id: string; block: string | undefined }> = [];
     const origScroll = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = function (this: Element, opts?: ScrollIntoViewOptions) {
@@ -449,23 +516,56 @@ describe('Run 详情 Turns/Trace tab（Run Player 架构）', () => {
       });
       expect(revealed.filter(r => r.id === 'rop-t-b0').length).toBe(cntBefore);
 
-      // Run 轨节点点击（publish 初始收起）：节点块居中揭示且不展开——
-      // 不出现展开态的「本代未运行」占位，也不取成员分页
+      // 时间线单击（成员B道 87.5% 处 = 第二轮时刻）：走统一选中管线——详情直取、
+      // 该轮行居中揭示并点亮、播放头跟到该轮起点（整段 160s 的第 140s）
       const fetchesBefore = fetchCalls.length;
-      const railBtn = [...turnsTab.querySelectorAll('[data-rail-track] button')].find(b => b.getAttribute('title')?.includes('publish'))!;
-      await act(async () => {
-        railBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-        await new Promise(r => setTimeout(r, 20));
-      });
-      const revealedNode = revealed
-        .filter(r => !r.id.startsWith('rop-t-'))
-        .map(r => ({ el: document.querySelector(`[data-node="${r.id}"]`), block: r.block }))
-        .find(x => x.el?.textContent?.includes('publish'));
-      expect(revealedNode?.block).toBe('center');
-      expect(revealedNode?.el?.textContent).not.toContain('本代未运行');
-      expect(fetchCalls.length).toBe(fetchesBefore);
+      await clickTimeline(turnsTab, 'ses_mini_b', 875);
+      expect(fetchCalls).toContain('/api/observe/turn/rop-t-b1');
+      expect(fetchCalls.length).toBe(fetchesBefore + 1);
+      expect(revealed.some(r => r.id === 'rop-t-b1' && r.block === 'center')).toBe(true);
+      expect(document.querySelector('[data-turn-row="rop-t-b1"]')?.className).toContain('ring-primary/30');
+      expect(selectionX(turnsTab)).toBe(875);
     } finally {
       Element.prototype.scrollIntoView = origScroll;
+    }
+  });
+
+  it('时间线单击即跳：点哪一刻就选中那一刻的轮次，不拉任何额外数据；搜索驻留时先退搜索', async () => {
+    Element.prototype.scrollIntoView = function () {};
+    try {
+      await renderPage('?tab=turns');
+      const turnsTab = document.querySelector('[data-run-tab="turns"]')!;
+      // 整段 02:00:10→02:02:50（160s）：成员A道占前 120s（0–75%），成员B道占后 40s
+      //（75–100%）——首 20s 属 b0（75–87.5%）、后 20s 属 b1（87.5–100%）
+      let fetchesBefore = fetchCalls.length;
+      await clickTimeline(turnsTab, 'ses_mini_b', 800);
+      expect(fetchCalls).toContain('/api/observe/turn/rop-t-b0');
+      expect(fetchCalls.length).toBe(fetchesBefore + 1);
+      expect(document.getElementById('turn-detail-top')?.textContent).toContain('成员B的回应');
+      fetchesBefore = fetchCalls.length;
+      await clickTimeline(turnsTab, 'ses_mini_b', 940);
+      expect(fetchCalls).toContain('/api/observe/turn/rop-t-b1');
+      expect(fetchCalls.length).toBe(fetchesBefore + 1);
+      expect(selectionX(turnsTab)).toBe(875);
+
+      // 搜索驻留：命中索引盖住左列 → 点时间线 = 退出搜索（命中索引让位、
+      // 列表回位）并选中该刻的轮次
+      const input = turnsTab.querySelector('input[placeholder="搜索本 run…"]') as HTMLInputElement;
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      await act(async () => {
+        setter.call(input, '成员');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 20));
+      });
+      expect(turnsTab.querySelector('[data-turns-hits]')).toBeTruthy();
+      await clickTimeline(turnsTab, 'ses_mini_a', 150);
+      expect(turnsTab.querySelector('[data-turns-hits]')).toBeNull();
+      expect(selectionX(turnsTab)).toBe(0);
+      expect(turnsTab.querySelector('[data-turn-list]')?.getAttribute('inert')).toBe(null);
+      expect(document.getElementById('turn-detail-top')?.textContent).toContain('成员A的开始任务');
+    } finally {
+      Element.prototype.scrollIntoView = origScrollGlobal;
     }
   });
 

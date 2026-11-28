@@ -6,10 +6,12 @@
 // INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 // See LICENSE in the root of the software repository for the full text of the License.
 
+import fs from 'node:fs';
+import path from 'node:path';
 import Database from 'better-sqlite3';
 import { peekSqliteTables } from '../sqlite-detect';
 import type { SessionListItem, RawInteraction, ToolCallInfo, TokenUsage } from '../../shared/types';
-import type { SessionSourceMeta } from './contract';
+import type { SessionFileRef, SessionSourceMeta } from './contract';
 
 // 内容级识别（SourceDescriptor.detectContent 能力，格式轴）：ExportMeta
 // 格式头（producer 声明表）是强信号；存量旧件无此表回落 Prisma 大写表
@@ -20,6 +22,14 @@ export function detectContent(filePath: string): boolean | null {
   if (tables == null) return null;
   if (tables.has('ExportMeta')) return true;
   return tables.has('Session');
+}
+
+// 会话原始文件集（SourceDescriptor.listSessionFiles 能力实现）：导出件一整个
+// 文件就是该会话的原件（件内可含多行 Session，但文件本身不可拆）；文件不在
+// 盘上 → 空数组（有原件、已缺失）。
+export function listSessionFiles(dbPath: string): SessionFileRef[] | null {
+  if (!fs.existsSync(dbPath) || !fs.statSync(dbPath).isFile()) return [];
+  return [{ role: 'main', filePath: dbPath, relPath: path.basename(dbPath) }];
 }
 
 export function listSessions(dbPath: string): SessionListItem[] {

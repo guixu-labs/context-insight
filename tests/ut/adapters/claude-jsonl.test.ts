@@ -6,8 +6,8 @@
 // INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 // See LICENSE in the root of the software repository for the full text of the License.
 
-import { describe, it, expect } from 'vitest';
-import { listSessions, readSession, listSubagentSessions } from '../../../src/lib/ingest/adapters/claude-jsonl.ts';
+import { describe, it, expect, afterAll, beforeAll } from 'vitest';
+import { listSessions, readSession, listSubagentSessions, listSessionFiles, resolveCaptureFile } from '../../../src/lib/ingest/adapters/claude-jsonl.ts';
 import { readFullContext } from '../../../src/lib/ingest/adapters/claude-jsonl-full-context.ts';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -546,6 +546,45 @@ describe('claude-jsonl adapter', () => {
     });
   });
 });
+
+describe('会话原始文件集（listSessionFiles）', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-session-files-'));
+  const SID = 'ses-main';
+  const SUB = 'agent-sub1';
+  afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+  beforeAll(() => {
+    fs.mkdirSync(path.join(dir, SID, 'subagents'), { recursive: true });
+    fs.writeFileSync(path.join(dir, `${SID}.jsonl.7z`), '7z');
+    fs.writeFileSync(path.join(dir, `${SID}.meta.json`), '{}');
+    fs.writeFileSync(path.join(dir, SID, 'subagents', `${SUB}.jsonl.gz`), 'gz');
+    fs.writeFileSync(path.join(dir, SID, 'subagents', `${SUB}.meta.json`), '{}');
+    fs.writeFileSync(path.join(dir, SID, 'subagents', 'stray.json'), '{}');
+  });
+
+  it('resolveCaptureFile：sourcePath 指向明文 / 指向压缩态，都解析到盘上真实存在的那一份', () => {
+    expect(resolveCaptureFile(path.join(dir, `${SID}.jsonl`))).toBe(path.join(dir, `${SID}.jsonl.7z`));
+    expect(resolveCaptureFile(path.join(dir, `${SID}.jsonl.7z`))).toBe(path.join(dir, `${SID}.jsonl.7z`));
+    expect(resolveCaptureFile(path.join(dir, SID, 'subagents', `${SUB}.jsonl.gz`))).toBe(path.join(dir, SID, 'subagents', `${SUB}.jsonl.gz`));
+    expect(resolveCaptureFile(path.join(dir, 'gone.jsonl'))).toBeNull();
+    expect(resolveCaptureFile(path.join(dir, 'gone.jsonl.7z'))).toBeNull();
+  });
+
+  it('主文件（双形态解析）+ 伴随 meta + 子代理文件及其 meta，盘上真实形态原样；无关文件不进集', () => {
+    const refs = listSessionFiles(path.join(dir, `${SID}.jsonl`), SID)!;
+    expect(refs.map(r => [r.role, path.relative(dir, r.filePath), r.relPath])).toEqual([
+      ['main', `${SID}.jsonl.7z`, `${SID}.jsonl.7z`],
+      ['meta', `${SID}.meta.json`, `${SID}.meta.json`],
+      ['subagent', path.join(SID, 'subagents', `${SUB}.jsonl.gz`), `subagents/${SUB}.jsonl.gz`],
+      ['subagent-meta', path.join(SID, 'subagents', `${SUB}.meta.json`), `subagents/${SUB}.meta.json`],
+    ]);
+    expect(new Set(refs.map(r => r.relPath)).size).toBe(refs.length);
+  });
+
+  it('主文件三种形态都不在盘上 → []（有原件、已缺失）', () => {
+    expect(listSessionFiles(path.join(dir, 'gone.jsonl'), SID)).toEqual([]);
+  });
+});
+
 
 // Copyright (c) 2025-2026 Huawei Technologies Co., Ltd.
 // This program is free software: you can redistribute it and/or modify it under the terms and conditions of

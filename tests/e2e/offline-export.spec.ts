@@ -15,17 +15,7 @@
 import { expect, test, type Page } from "./fixtures";
 import { CLAUDE_SAMPLE_SESSION_ID } from "./constants";
 import { RunWorkbenchPO } from "./support/pom/RunWorkbenchPO";
-
-/** headless Chromium 带 showSaveFilePicker，但无用户手势时以 AbortError 拒
- *  绝——downloadHtml 对 AbortError 静默收场（真实用户取消保存对话框的同款
- *  路径），测试就永远等不到 download 事件。测试环境剥掉该 API，让导出走
- *  应用自带的 fallbackDownload（Blob 锚点下载——Firefox/Safari 同款生产
- *  路径，Playwright 可捕获）。 */
-async function stripFilePicker(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).showSaveFilePicker = undefined;
-  });
-}
+import { stripFilePicker } from "./support/file-picker";
 
 test.describe("离线 HTML 导出", () => {
   test("导出动作：HTML 文件下载", async ({ page }) => {
@@ -33,9 +23,10 @@ test.describe("离线 HTML 导出", () => {
     const run = new RunWorkbenchPO(page);
     await run.goto(`solo:${CLAUDE_SAMPLE_SESSION_ID}`);
 
+    await run.openExportMenu();
     const [download] = await Promise.all([
       page.waitForEvent("download"),
-      page.getByTitle("导出离线 HTML").click(),
+      run.exportMenuItem("html").click(),
     ]);
     expect(download.suggestedFilename()).toMatch(/\.html$/);
   });
@@ -45,9 +36,10 @@ test.describe("离线 HTML 导出", () => {
     const run = new RunWorkbenchPO(page);
     await run.goto(`solo:${CLAUDE_SAMPLE_SESSION_ID}`);
 
+    await run.openExportMenu();
     const [download] = await Promise.all([
       page.waitForEvent("download"),
-      page.getByTitle("导出离线 HTML").click(),
+      run.exportMenuItem("html").click(),
     ]);
     // download.path() 是无扩展名的 UUID 临时文件——Chromium 对 file:// 无扩展
     // 名文件不做 HTML 嗅探、整文件按纯文本渲染（#root 不存在）。saveAs 落到

@@ -8,12 +8,10 @@
 
 // @vitest-environment happy-dom
 
-// Perf 时间线条子（subagent 执行段）↔ Turns 对应 IT（run 视角）：
-//   ① 执行时间线卡渲染子代理条（data-bar = executionId，泳道图自 Overview 迁入）
-//   ② 双击条子 → onOpenTurn（该 subagent 会话首轮 turnId）——定位出口
-//      唯一收敛到 turnId，由装配层接 Turns 深链管线
-//   ③ 热点排行：行内定位角标与轮次行点击走同一 onOpenTurn 出口
-//      （行属性 data-lane-row——与时间线卡的 data-lane 泳道容器区分）
+// Perf 热点排行 ↔ Turns 对应 IT（run 视角）：执行时间线已迁至 Turns 顶部
+// （RunTurnsTimeline，单击即跳），Perf 页不再有时间线卡、不取车道表；行内
+// 定位角标与轮次行点击走同一 onOpenTurn 出口——定位出口唯一收敛到 turnId，
+// 由装配层接 Turns 深链管线。
 
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { createElement } from 'react'
@@ -92,23 +90,17 @@ async function renderPanorama(onOpenTurn?: (turnId: string) => void) {
   await act(async () => { })
 }
 
-describe('PerfPanorama 时间线条子 → Turns 对应（run 视角）', () => {
-  it('时间线卡渲染子代理条；双击条子与热点行定位 → onOpenTurn(会话首轮)', async () => {
+describe('PerfPanorama 热点排行 → Turns 对应（run 视角）', () => {
+  it('Perf 页无执行时间线卡、不取车道表；热点行定位角标 → onOpenTurn(会话首轮)', async () => {
     const opened: string[] = []
     await renderPanorama(turnId => { opened.push(turnId) })
 
-    // ① 执行时间线卡：标题 + 子代理条（data-bar = executionId）
-    expect(container!.textContent).toContain('Agent Swimlane (1 · 子代理 1)')
-    const bar = container!.querySelector('[data-bar="exec-sub-1"]')
-    expect(bar).toBeTruthy()
+    // ① 执行时间线不在 Perf（已迁 Turns 顶部）：无时间线卡、无条子、无车道表请求
+    expect(container!.textContent).not.toContain('Agent Swimlane')
+    expect(container!.querySelector('[data-bar]')).toBeNull()
+    expect(vi.mocked(fetch).mock.calls.some(c => String(c[0]).includes('/lanes'))).toBe(false)
 
-    // ② 双击条子 → onOpenTurn（该 subagent 会话首轮 turnId）
-    await act(async () => {
-      bar!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
-    })
-    expect(opened).toEqual(['turn-sub-jump'])
-
-    // ③ 热点排行行内定位角标 → 同一出口（data-lane-row 区别于时间线 data-lane）
+    // ② 热点排行行内定位角标 → 唯一定位出口
     const laneRow = container!.querySelector('[data-lane-row="ses_sub_jump_1"]')
     expect(laneRow).toBeTruthy()
     expect(laneRow!.textContent).toContain('子代理 · 成员甲')
@@ -117,7 +109,7 @@ describe('PerfPanorama 时间线条子 → Turns 对应（run 视角）', () => 
     await act(async () => {
       locateBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    expect(opened).toEqual(['turn-sub-jump', 'turn-sub-jump'])
+    expect(opened).toEqual(['turn-sub-jump'])
   })
 
   it('热点行展开 → 轮次行点击 → onOpenTurn(该轮 turnId)；展开内含执行切片', async () => {

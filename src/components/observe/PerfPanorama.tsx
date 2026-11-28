@@ -8,12 +8,11 @@
 // See LICENSE in the root of the software repository for the full text of the License.
 
 // Perf 全景（run 视角）：画像（时间与 Token 构成——总量瓦片归 Overview，
-// 不复读）→ 执行时间线（AgentSwimlaneV2，自 Overview 迁入——真实时间轴/
-// 并发/空档是时间维度的唯一视图，量级对比由热点排行承接，不再摆执行序
-// 列柱状图）→ 热点排行（PerfLaneList）→ 效率分布。取数恒为 run 合并端点
-// （executions / turns / bridges / lanes 镜像形状），无会话隔离；定位出口
-// 唯一收敛到 turnId（时间线条子/热点行/效率柱 → 泳道首轮），由装配层接
-// Turns 深链管线。
+// 不复读）→ 热点排行（PerfLaneList）→ 效率分布。执行时间线不在本页——
+// 它是时间维度的导航仪，已迁至 Turns 顶部（RunTurnsTimeline），点击即
+// 选中该刻的轮次。取数恒为 run 合并端点（executions / turns / bridges
+// 镜像形状），无会话隔离；定位出口唯一收敛到 turnId（热点行/效率柱 →
+// 泳道首轮），由装配层接 Turns 深链管线。
 
 import { useEffect, useMemo, useState } from "react"
 import {
@@ -23,28 +22,18 @@ import {
 } from "./perf-shared"
 import { PerfLaneList } from "./PerfLaneList"
 import { PerfToolTime } from "./PerfToolTime"
-import { AgentSwimlaneV2, type SwimTurnTarget } from "./AgentSwimlaneV2"
-import type { AgentItem, BridgeItem } from "./AgentCallGraph"
 import type { RunToolStats } from "@/lib/observe/collectors/tool-stats"
 import { ACTIVE_GAP_THRESHOLD_MS, ACTIVE_LATENCY_CAP_MS, clusterActiveSegments } from "@/lib/active-time"
 import type { RunTimeSummary } from "@/lib/observe/run-time-summary"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface Props {
-  /** run 合并端点（executions / turns / bridges / lanes，返回形状镜像） */
-  endpoints: { executions: string; turns: string; bridges: string; lanes?: string; toolStats?: string }
+  /** run 合并端点（executions / turns / bridges，返回形状镜像） */
+  endpoints: { executions: string; turns: string; bridges: string; toolStats?: string }
   /** 定位出口：统一收敛到 turnId（Turns 深链管线入态） */
   onOpenTurn?: (turnId: string) => void
   /** 搜索出口：Turns 搜索语法深链（工具耗时卡的行/格下钻——命中索引即调用清单） */
   onOpenSearch?: (q: string) => void
-  /** 时间线载荷直供（离线导出查看器）：提供时时间线卡与跳转解析免请求渲染 */
-  swimlanePayload?: {
-    agents: AgentItem[]
-    bridges: BridgeItem[]
-    lanes?: string[]
-    /** 跳转解析用轮次（载荷直供时优先于端点取数） */
-    turns?: TurnPerf[]
-  } | null
   /** Run 级统一时间摘要：Overview/Perf 数值单一源 */
   timeSummary?: RunTimeSummary | null
 }
@@ -104,21 +93,16 @@ function activeMsWithin(intervals: Array<{ start: number; end: number }>, start:
 const DUR_ACTIVE = "#6366f1"
 const DUR_INACTIVE = "#f59e0b"
 
-export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayload, timeSummary = null }: Props) {
+export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, timeSummary = null }: Props) {
   const [items, setItems] = useState<ExecItem[] | null>(null)
   const [turns, setTurns] = useState<TurnPerf[] | null>(null)
   const [bridges, setBridges] = useState<BridgePerf[]>([])
-  const [laneTable, setLaneTable] = useState<string[]>([])
-  const [laneTableInferred, setLaneTableInferred] = useState(false)
   const [toolStats, setToolStats] = useState<RunToolStats | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
     const fetchJson = (url: string) => fetch(url).then(r => r.json())
-    const lanesP = endpoints.lanes
-      ? fetchJson(endpoints.lanes).catch(() => null)
-      : Promise.resolve(null)
     const toolStatsP = endpoints.toolStats
       ? fetchJson(endpoints.toolStats).catch(() => null)
       : Promise.resolve(null)
@@ -126,16 +110,13 @@ export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayl
       fetchJson(endpoints.executions),
       fetchJson(endpoints.turns),
       fetchJson(endpoints.bridges),
-      lanesP,
       toolStatsP,
     ])
-      .then(([execData, turnsData, bridgesData, lanesData, toolStatsData]) => {
+      .then(([execData, turnsData, bridgesData, toolStatsData]) => {
         if (cancelled) return
         setItems(execData.items ?? [])
         setTurns(turnsData.items ?? [])
         setBridges(bridgesData.items ?? [])
-        setLaneTable(Array.isArray(lanesData?.lanes) ? lanesData.lanes : [])
-        setLaneTableInferred(lanesData?.source === "inferred")
         setToolStats(toolStatsData?.tools?.length > 0 ? toolStatsData : null)
         setLoading(false)
       })
@@ -147,11 +128,6 @@ export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayl
       })
     return () => { cancelled = true }
   }, [endpoints])
-
-  // 时间线数据：载荷直供（离线导出）优先，线上回落同源端点取数
-  const swimAgents: AgentItem[] = swimlanePayload?.agents ?? items ?? []
-  const swimBridges: BridgeItem[] = swimlanePayload?.bridges ?? bridges
-  const swimLanes: string[] = swimlanePayload?.lanes ?? laneTable
 
   // 热点排行模型（run 观测基础单元）：子代理轮按 subagentSessionId 归组
   //（owner = 父成员）；成员 root 轮按成员归组（成员会话即一级单元）。
@@ -282,48 +258,10 @@ export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayl
     return map
   }, [model])
 
-  // 时间线跳转：子代理条 → 该会话首轮（多次派发时按派发时刻后定位）；
-  // 主泳道承接 subagent 结束的活跃段 → 父 Agent 接收回复的 turn；无则回退子代理末轮；
-  // root 条 → 该成员首轮。
-  // 唯一出口 onOpenTurn(turnId)；解析用轮次载荷直供优先（离线导出），线上回落端点取数
-  const jumpTurns = swimlanePayload?.turns ?? turns
-  const openSwimTurn = (agentSessionId: string | null, sinceMs?: number, memberTaskId?: string | null, target?: SwimTurnTarget) => {
-    if (!onOpenTurn || !jumpTurns) return
-    if (agentSessionId) {
-      const subs = jumpTurns
-        .filter(t => t.isSubagent && t.subagentSessionId === agentSessionId)
-        .sort((a, b) => {
-          const at = a.createdAt ? new Date(a.createdAt).getTime() : Number.POSITIVE_INFINITY
-          const bt = b.createdAt ? new Date(b.createdAt).getTime() : Number.POSITIVE_INFINITY
-          return (at - bt) || (a.turnIndex - b.turnIndex)
-        })
-      if (target?.position === "last") {
-        if (target.parentTurnId) {
-          onOpenTurn(target.parentTurnId)
-          return
-        }
-        const bounded = target.atMs == null
-          ? subs
-          : subs.filter(t => t.createdAt && new Date(t.createdAt).getTime() <= target.atMs!)
-        const last = bounded.at(-1) ?? subs.at(-1)
-        if (last) onOpenTurn(last.turnId)
-        return
-      }
-      const first = sinceMs
-        ? subs.find(t => t.createdAt && new Date(t.createdAt).getTime() >= sinceMs) ?? subs[0]
-        : subs[0]
-      if (first) onOpenTurn(first.turnId)
-      return
-    }
-    const roots = memberTaskId
-      ? jumpTurns.filter(t => !t.isSubagent && t.member?.taskId === memberTaskId)
-      : jumpTurns.filter(t => !t.isSubagent)
-    if (roots[0]) onOpenTurn(roots[0].turnId)
-  }
 
   if (loading) return <PerfSkeleton />
 
-  if (!model && lanes.length === 0 && swimAgents.length === 0) {
+  if (!model && lanes.length === 0) {
     return (
       <Card {...perfEntrance(0, PERF_CARD_SM)} size="sm">
         <CardContent className="px-5 py-6 text-xs text-muted-foreground">暂无执行数据</CardContent>
@@ -334,17 +272,6 @@ export function PerfPanorama({ endpoints, onOpenTurn, onOpenSearch, swimlanePayl
   return (
     <div className="space-y-4">
       {model && <ProfileCard model={model} />}
-      {swimAgents.length > 0 && (
-        <div {...perfEntrance(75)}>
-          <AgentSwimlaneV2
-            agents={swimAgents}
-            bridges={swimBridges}
-            lanes={swimLanes}
-            lanesInferred={laneTableInferred}
-            onViewTurns={openSwimTurn}
-          />
-        </div>
-      )}
       {lanes.length > 0 && (
         <PerfLaneList
           lanes={lanes}

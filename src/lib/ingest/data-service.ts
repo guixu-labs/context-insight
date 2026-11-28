@@ -10,7 +10,7 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import { BRAND_SOURCE_TYPE, isBrandSourceType } from '@/lib/branding';
-import { getSource, sourceOfFramework, detectSourceByContent } from './adapters/registry';
+import { getSource, sourceOfSessionRow } from './adapters/registry';
 import { listSubagentSessionsWithDb, readSessionWithDb, readSessionMeta } from './adapters/opencode-db';
 import { extractVersion as extractClaudeVersion } from './adapters/claude-jsonl';
 import { classifyProxyCapture, readCcSessionMeta, proxyRecordingFrameworkFromVersion } from './proxy-classify';
@@ -1039,22 +1039,13 @@ export async function deltaRefreshSession(
     throw new Error(`Session not found or no sourcePath: "${sessionId}"`);
   }
 
-  // sourceType 推断（适配器路由，格式轴）：格式是文件的属性——sourcePath
-  // 内容探测优先（detectSourceByContent 单点）。容器导出件里的 claude 会话：
-  // framework 是 claude-code 而 sourcePath 是 insight 导出 db，按 framework
-  // 反查会路由到 claude-jsonl 去解析 sqlite（静默读 0 条）。文件缺失/不认领
-  // 才回落 framework 反查兜底：proxy 捕获（claude / opencode / codex，
-  // version 带 -proxy 后缀）都是 claude 格式 jsonl 变体 → claude-jsonl
-  // adapter；原生 framework → sourceOfFramework 单点反查
-  const fromFile = detectSourceByContent(session.sourcePath);
-  const sourceType = fromFile
-    ?? (isProxyVersion(session.version) || session.framework?.endsWith('-proxy')
-      ? 'claude-jsonl'
-      : (session.framework != null ? (sourceOfFramework(session.framework) ?? session.framework) : null));
-  if (!sourceType) {
+  // 适配器路由（格式轴单点 = sourceOfSessionRow；容器导出件里的 claude 会话
+  // framework 是 claude-code 而 sourcePath 是 insight 导出 db，按 framework 反查
+  // 会路由到 claude-jsonl 去解析 sqlite）
+  const srcType = sourceOfSessionRow(session)?.sourceType;
+  if (!srcType) {
     throw new Error(`No adapter for: "${session.framework}"`);
   }
-  const srcType: string = sourceType;
 
   let sharedDb: Database.Database | null = null;
   if (srcType === 'opencode-db') {
