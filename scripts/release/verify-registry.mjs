@@ -64,8 +64,7 @@ async function fetchDistTags(name, timeoutMs) {
   return response.json()
 }
 
-async function waitForTag() {
-  const deadline = Date.now() + waitSeconds * 1000
+async function waitForTag(deadline) {
   let attempt = 0
   const states = {}
   while (true) {
@@ -120,6 +119,39 @@ function run(command, args, options = {}) {
   return result
 }
 
+function tryRun(command, args, options = {}) {
+  return spawnSync(command, args, {
+    encoding: 'utf8',
+    timeout: options.timeout ?? 300_000,
+    maxBuffer: 32 * 1024 * 1024,
+    ...options,
+  })
+}
+
+function failureDetail(command, args, result) {
+  const detail = [result.stdout, result.stderr, result.error?.message].filter(Boolean).join('\n').trim()
+  return `${command} ${args.join(' ')} failed with exit ${result.status ?? 'spawn-error'}${detail ? `\n${detail}` : ''}`
+}
+
+async function installWithRetry(spec, temp, prefix, env, deadline) {
+  const args = ['install', '--global', '--prefix', prefix, `${spec.name}@${tag}`, '--no-audit', '--no-fund', '--no-package-lock', '--prefer-online']
+  let attempt = 0
+  while (true) {
+    attempt += 1
+    const remainingMs = deadline - Date.now()
+    const timeout = waitSeconds > 0 ? Math.max(1, Math.min(300_000, remainingMs)) : 300_000
+    const result = tryRun('npm', args, { cwd: temp, env, timeout })
+    if (!result.error && result.status === 0) return
+
+    const failure = failureDetail('npm', args, result)
+    const retryBudget = deadline - Date.now()
+    if (waitSeconds === 0 || retryBudget <= 0) throw new Error(failure)
+    const delay = Math.min(pollSeconds * 1000, retryBudget)
+    console.log(`[registry-install] attempt ${attempt}: ${spec.name}@${tag} not installable yet; retrying in ${Math.ceil(delay / 1000)}s`)
+    await sleep(delay)
+  }
+}
+
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'context-insight-registry-smoke-'))
 const prefix = path.join(temp, 'prefix')
 const home = path.join(temp, 'home')
@@ -138,11 +170,12 @@ const env = {
   CANNBOT_INSIGHT_HOME: home,
 }
 
-if (waitSeconds > 0) await waitForTag()
+const deadline = Date.now() + waitSeconds * 1000
+if (waitSeconds > 0) await waitForTag(deadline)
 
 try {
   for (const spec of packages) {
-    run('npm', ['install', '--global', '--prefix', prefix, `${spec.name}@${tag}`, '--no-audit', '--no-fund', '--no-package-lock', '--prefer-online'], { cwd: temp, env })
+    await installWithRetry(spec, temp, prefix, env, deadline)
     for (const command of spec.commands) {
       const executable = path.join(prefix, 'bin', process.platform === 'win32' ? `${command}.cmd` : command)
       const output = run(executable, ['--version'], { cwd: temp, env, timeout: 60_000 }).stdout.trim()

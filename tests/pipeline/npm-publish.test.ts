@@ -316,3 +316,77 @@ process.exit(2)
     }
   })
 })
+
+describe("registry install propagation retry", () => {
+  it("dist-tag 可见但 npm install 暂时 ETARGET 时会在同一 deadline 内重试", async () => {
+    const server = createServer((_request, response) => {
+      response.setHeader("content-type", "application/json")
+      response.end(JSON.stringify({ beta: "9.9.9" }))
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject)
+      server.listen(0, "127.0.0.1", resolve)
+    })
+    const address = server.address()
+    if (!address || typeof address === "string") throw new Error("missing test registry port")
+
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "registry-install-retry-"))
+    const counterPath = path.join(tmp, "counts.json")
+    fs.writeFileSync(path.join(tmp, "npm"), `#!/usr/bin/env node
+const fs = require('node:fs');
+const path = require('node:path');
+const args = process.argv.slice(2);
+if (args[0] !== 'install') process.exit(2);
+const prefix = args[args.indexOf('--prefix') + 1];
+const spec = args[args.indexOf('--prefix') + 2];
+const name = spec.split('@')[0];
+const counts = fs.existsSync(${JSON.stringify(counterPath)}) ? JSON.parse(fs.readFileSync(${JSON.stringify(counterPath)}, 'utf8')) : {};
+if (name === 'cannbot-insight' && !counts[name]) {
+  counts[name] = 1;
+  fs.writeFileSync(${JSON.stringify(counterPath)}, JSON.stringify(counts));
+  console.error('npm error code ETARGET');
+  process.exit(1);
+}
+counts[name] = (counts[name] || 0) + 1;
+fs.writeFileSync(${JSON.stringify(counterPath)}, JSON.stringify(counts));
+fs.mkdirSync(path.join(prefix, 'bin'), { recursive: true });
+const commands = name === 'context-insight'
+  ? { 'context-insight': 'Context-Insight v9.9.9', ctxi: 'Context-Insight v9.9.9' }
+  : { 'cannbot-insight': 'CANNBot-Insight v9.9.9', cbi: 'CANNBot-Insight v9.9.9' };
+for (const [command, output] of Object.entries(commands)) {
+  const file = path.join(prefix, 'bin', command);
+  fs.writeFileSync(file, '#!/bin/sh\\necho "' + output + '"\\n', { mode: 0o755 });
+}
+`, { mode: 0o755 })
+
+    try {
+      const result = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+        const child = spawn(process.execPath, [
+          "scripts/release/verify-registry.mjs",
+          "--tag", "beta",
+          "--version", "9.9.9",
+          "--wait-seconds", "5",
+          "--poll-seconds", "1",
+          "--registry", `http://127.0.0.1:${address.port}/`,
+        ], {
+          cwd: PKG_DIR,
+          env: { ...process.env, PATH: `${tmp}${path.delimiter}${process.env.PATH ?? ""}` },
+        })
+        let stdout = ""
+        let stderr = ""
+        child.stdout.on("data", (chunk) => { stdout += chunk })
+        child.stderr.on("data", (chunk) => { stderr += chunk })
+        child.once("error", reject)
+        child.once("close", (code) => resolve({ code, stdout, stderr }))
+      })
+
+      expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0)
+      expect(result.stdout).toContain("[registry-install] attempt 1: cannbot-insight@beta not installable yet")
+      expect(result.stdout).toContain("[registry-smoke] context-insight@beta (9.9.9)")
+      expect(result.stdout).toContain("[registry-smoke] cannbot-insight@beta (9.9.9)")
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true })
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 15_000)
+})
